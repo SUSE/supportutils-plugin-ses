@@ -72,10 +72,12 @@ fi
 section_header "Ceph log files"
 
 plog_files $LOG_LINES /var/log/ceph/*.log
-
-#############################################################
-section_header "Radosgw log files"
-
+# Depending on how radosgw is configured, its log files may
+# be in /var/log/ceph/ (and thus captured above), or may be in
+# /var/log/radosgw (which is what the ceph barclamp configures
+# for crowbar deploys
+plog_files $LOG_LINES /var/log/radosgw/*.log
+# /var/log/ceph-radosgw/ was also used at some point in the past
 plog_files $LOG_LINES /var/log/ceph-radosgw/*.log
 
 #############################################################
