@@ -43,18 +43,24 @@ done
 #############################################################
 section_header "Ceph cluster status"
 
+mkdir $LOG/ceph
+
 if [ -x /usr/bin/ceph ]; then
     # timeout status commands after 5 seconds
     CT=5
-    plugin_command "ceph --connect-timeout=$CT -s"
-    plugin_command "ceph --connect-timeout=$CT mon dump"
-    plugin_command "ceph --connect-timeout=$CT osd tree"
+    plugin_command "ceph --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
+    plugin_command "ceph --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
+    plugin_command "ceph --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
     # `ceph report` does actually include the above information, but
     # in JSON format.  Since adding `ceph report`, the above commands
     # remain, because their output is easier to read in a hurry ;)
-    plugin_command "ceph --connect-timeout=$CT report"
-    plugin_command "timeout $CT rados df"
-    plugin_command "timeout $CT rbd ls"
+    plugin_command "ceph --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
+    plugin_command "timeout $CT rados df" > $LOG/ceph/rados-df 2>&1
+    plugin_command "timeout $CT rbd ls" > $LOG/ceph/rbd-ls 2>&1
+
+    plugin_message "Cluster status dumped to ceph subdirectory"
+else
+    plugin_message "/usr/bin/ceph not found"
 fi
 
 #############################################################
@@ -63,7 +69,11 @@ section_header "Ceph config"
 if [ -d /etc/ceph ]; then
     if files=$(find /etc/ceph -type f | egrep -v '.keyring$'); then
         if [ -n "$files" ]; then
-            pconf_files $files
+            mkdir $LOG/ceph/conf
+            for f in $files ; do
+                pconf_files $f > $LOG/ceph/conf/$(basename $f)
+            done
+            plugin_message "Ceph config copied to ceph/conf subdirectory"
         fi
     fi
 fi
@@ -71,19 +81,33 @@ fi
 #############################################################
 section_header "Ceph log files"
 
-plog_files $LOG_LINES /var/log/ceph/*.log
+if [ -d /var/log/ceph ]; then
+    mkdir -p $LOG/ceph/log/ceph
+    cp /var/log/ceph/*.log $LOG/ceph/log/ceph/
+    plugin_message "Ceph logs copied to ceph/log subdirectory"
+fi
 # Depending on how radosgw is configured, its log files may
 # be in /var/log/ceph/ (and thus captured above), or may be in
 # /var/log/radosgw (which is what the ceph barclamp configures
 # for crowbar deploys
-plog_files $LOG_LINES /var/log/radosgw/*.log
+if [ -d /var/log/radosgw ]; then
+    mkdir -p $LOG/ceph/log/radosgw
+    cp /var/log/radosgw/*.log $LOG/ceph/log/radosgw/
+fi
 # /var/log/ceph-radosgw/ was also used at some point in the past
-plog_files $LOG_LINES /var/log/ceph-radosgw/*.log
+if [ -d /var/log/ceph-radosgw ]; then
+    mkdir -p $LOG/ceph/log/ceph-radosgw
+    cp /var/log/ceph-radosgw/*.log $LOG/ceph/log/ceph-radosgw/
+fi
 
 #############################################################
 section_header "Calamari log files"
 
-plog_files $LOG_LINES /var/log/calamari/*.log
+if [ -d /var/log/calamari ]; then
+    mkdir -p $LOG/ceph/log/calamari
+    cp /var/log/calamari/*.log $LOG/ceph/log/calamari/
+    plugin_message "Calamari logs copied to ceph/log subdirectory"
+fi
 
 #############################################################
 section_header "Salt config"
