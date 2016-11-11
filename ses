@@ -110,6 +110,15 @@ if [ -d /var/log/calamari ]; then
 fi
 
 #############################################################
+section_header "openATTIC log files"
+
+if [ -d /var/log/openattic ]; then
+    mkdir -p $LOG/ceph/log/openattic
+    cp /var/log/openattic/*.log $LOG/ceph/log/openattic/
+    plugin_message "openATTIC logs copied to ceph/log subdirectory"
+fi
+
+#############################################################
 section_header "Salt config"
 
 if [ -d /etc/salt ]; then
