@@ -63,6 +63,12 @@ else
     plugin_message "/usr/bin/ceph not found"
 fi
 
+if [ -x /usr/sbin/ceph-disk ]; then
+    plugin_command "ceph-disk list" > $LOG/ceph/ceph-disk-list 2>&1
+else
+    plugin_message "/usr/sbin/ceph-disk not found"
+fi
+
 #############################################################
 section_header "Ceph config"
 
