@@ -11,6 +11,7 @@
 SVER=1.0.0
 RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
 LOG_LINES=5000  # 0 means include the entire file
+CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
 
 [ -s $RCFILE ] && . $RCFILE || { echo "ERROR: Initializing resource file: $RCFILE"; exit 1; }
 
@@ -53,6 +54,8 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "ceph --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
     plugin_command "ceph --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
     plugin_command "ceph --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
+    plugin_command "ceph --connect-timeout=$CT auth list" |
+        sed "s/\(key:\) .*/\1 $CENSORED/g" > $LOG/ceph/ceph-auth-list 2>&1
     # `ceph report` does actually include the above information, but
     # in JSON format.  Since adding `ceph report`, the above commands
     # remain, because their output is easier to read in a hurry ;)
