@@ -167,7 +167,7 @@ section_header "NFS-Ganesha config"
 if [ -e /etc/ganesha/ganesha.conf ]; then
     mkdir -p $LOG/ceph/conf/ganesha
     cp /etc/ganesha/ganesha.conf $LOG/ceph/conf/ganesha/
-    plugin_message "NFS-Ganesha config copied to ceph/ganesha/ subdirectory"
+    plugin_message "NFS-Ganesha config copied to ceph/conf/ganesha/ subdirectory"
 fi
 
 #############################################################
@@ -176,5 +176,5 @@ section_header "NFS-Ganesha log files"
 if [ -e /var/log/ganesha.log ]; then
     mkdir -p $LOG/ceph/log/ganesha
     cp /var/log/ganesha.log $LOG/ceph/log/ganesha/
-    plugin_message "NFS-Ganesha logs copied to ceph/log subdirectory"
+    plugin_message "NFS-Ganesha logs copied to ceph/log/ganesha/ subdirectory"
 fi
