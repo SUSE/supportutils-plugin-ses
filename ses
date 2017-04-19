@@ -121,12 +121,28 @@ if [ -d /var/log/calamari ]; then
 fi
 
 #############################################################
+section_header "openATTIC version"
+
+if [ -x /usr/sbin/oaconfig ]; then
+    plugin_command "/usr/sbin/oaconfig version" 2>&1
+fi
+
+#############################################################
+section_header "openATTIC config files"
+
+if [ -d /etc/openattic ]; then
+    mkdir -p $LOG/ceph/conf/openattic
+    cp -a /etc/openattic/* $LOG/ceph/conf/openattic/
+    plugin_message "openATTIC config copied to ceph/conf/openattic/ subdirectory"
+fi
+
+#############################################################
 section_header "openATTIC log files"
 
 if [ -d /var/log/openattic ]; then
     mkdir -p $LOG/ceph/log/openattic
     cp /var/log/openattic/*.log $LOG/ceph/log/openattic/
-    plugin_message "openATTIC logs copied to ceph/log subdirectory"
+    plugin_message "openATTIC logs copied to ceph/log/openattic/ subdirectory"
 fi
 
 #############################################################
