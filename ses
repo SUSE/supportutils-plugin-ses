@@ -178,3 +178,13 @@ if [ -e /var/log/ganesha.log ]; then
     cp /var/log/ganesha.log $LOG/ceph/log/ganesha/
     plugin_message "NFS-Ganesha logs copied to ceph/log/ganesha/ subdirectory"
 fi
+
+#############################################################
+section_header "Ceph related services"
+
+plugin_command "systemctl status -l 'ceph*'"
+plugin_command "systemctl status -l 'salt*'"
+plugin_command "systemctl status -l 'nfs-ganesha*'"
+plugin_command "systemctl status -l 'tcmu*'"
+
+#############################################################
