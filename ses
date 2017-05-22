@@ -182,9 +182,9 @@ fi
 #############################################################
 section_header "Ceph related services"
 
-plugin_command "systemctl status -l ceph*"
-plugin_command "systemctl status -l salt-m*"
-plugin_command "systemctl status -l nfs-ganesha*"
-plugin_command "systemctl status -l tcmu*"
+plugin_command "systemctl status -l 'ceph*'"
+plugin_command "systemctl status -l 'salt*'"
+plugin_command "systemctl status -l 'nfs-ganesha*'"
+plugin_command "systemctl status -l 'tcmu*'"
 
 #############################################################
