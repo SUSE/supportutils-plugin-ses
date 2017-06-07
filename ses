@@ -54,6 +54,7 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "ceph --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
     plugin_command "ceph --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
     plugin_command "ceph --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
+    plugin_command "ceph --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
     plugin_command "ceph --connect-timeout=$CT auth list" |
         sed "s/\(key:\) .*/\1 $CENSORED/g" > $LOG/ceph/ceph-auth-list 2>&1
     # `ceph report` does actually include the above information, but
@@ -160,6 +161,16 @@ fi
 section_header "Salt log files"
 
 plog_files $LOG_LINES /var/log/salt/{master,minion}
+
+
+#############################################################
+section_header "DeepSea salt pillar"
+
+if [ -d /srv/pillar ]; then
+    mkdir -p $LOG/ceph/deepsea/pillar
+    cp -r /srv/pillar/* $LOG/ceph/deepsea/pillar/
+    plugin_message "Salt pillar copied to deepsea/pillar subdirectory"
+fi
 
 #############################################################
 section_header "NFS-Ganesha config"
