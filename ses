@@ -95,7 +95,7 @@ section_header "Ceph log files"
 
 if [ -d /var/log/ceph ]; then
     mkdir -p $LOG/ceph/log/ceph
-    cp /var/log/ceph/*.log $LOG/ceph/log/ceph/
+    cp /var/log/ceph/* $LOG/ceph/log/ceph/
     plugin_message "Ceph logs copied to ceph/log subdirectory"
 fi
 # Depending on how radosgw is configured, its log files may
@@ -104,12 +104,12 @@ fi
 # for crowbar deploys
 if [ -d /var/log/radosgw ]; then
     mkdir -p $LOG/ceph/log/radosgw
-    cp /var/log/radosgw/*.log $LOG/ceph/log/radosgw/
+    cp /var/log/radosgw/* $LOG/ceph/log/radosgw/
 fi
 # /var/log/ceph-radosgw/ was also used at some point in the past
 if [ -d /var/log/ceph-radosgw ]; then
     mkdir -p $LOG/ceph/log/ceph-radosgw
-    cp /var/log/ceph-radosgw/*.log $LOG/ceph/log/ceph-radosgw/
+    cp /var/log/ceph-radosgw/* $LOG/ceph/log/ceph-radosgw/
 fi
 
 #############################################################
@@ -142,7 +142,7 @@ section_header "openATTIC log files"
 
 if [ -d /var/log/openattic ]; then
     mkdir -p $LOG/ceph/log/openattic
-    cp /var/log/openattic/*.log $LOG/ceph/log/openattic/
+    cp /var/log/openattic/* $LOG/ceph/log/openattic/
     plugin_message "openATTIC logs copied to ceph/log/openattic/ subdirectory"
 fi
 
@@ -186,7 +186,7 @@ section_header "NFS-Ganesha log files"
 
 if [ -e /var/log/ganesha/ganesha.log ]; then
     mkdir -p $LOG/ceph/log/ganesha
-    cp /var/log/ganesha/ganesha.log $LOG/ceph/log/ganesha/
+    cp /var/log/ganesha/* $LOG/ceph/log/ganesha/
     plugin_message "NFS-Ganesha logs copied to ceph/log/ganesha/ subdirectory"
 fi
 
