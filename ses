@@ -160,7 +160,11 @@ fi
 #############################################################
 section_header "Salt log files"
 
-plog_files $LOG_LINES /var/log/salt/{master,minion}
+if [ -d /var/log/salt ]; then
+    mkdir -p $LOG/ceph/log/salt
+    cp /var/log/salt/{master,minion} $LOG/ceph/log/salt/
+    plugin_message "Salt logs copied to ceph/log/salt subdirectory"
+fi
 
 
 #############################################################
