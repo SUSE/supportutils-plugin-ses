@@ -70,6 +70,42 @@ if [ -x /usr/bin/ceph ]; then
     while read pg; do
         plugin_command "timeout $((CT * 2)) ceph --connect-timeout=$CT pg $pg query" \
                        > $LOG/ceph/ceph-pg-${pg}-query 2>&1
+
+    ps auxww | sed -nEe 's/^.*ceph-(mds|mgr|mon|osd) .*-id? *([^ ]*) .*/\1.\2/p' |
+    while read daemon; do
+        mkdir -p $LOG/ceph/$daemon
+
+        ceph --connect-timeout=$CT daemon ${daemon} config show \
+             > $LOG/ceph/${daemon}/ceph-daemon-config 2>&1
+        ceph --connect-timeout=$CT daemon ${daemon} perf dump \
+             > $LOG/ceph/${daemon}/ceph-daemon-perf 2>&1
+
+        case $daemon in
+            mds.*)
+                ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
+                     > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
+                ceph --connect-timeout=$CT daemon ${daemon} status \
+                     > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
+                ;;
+            mgr.*)
+                ceph --connect-timeout=$CT daemon ${daemon} status \
+                     > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
+                ;;
+            mon.*)
+                ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
+                     > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
+                ;;
+            osd.*)
+                ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
+                     > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
+                ceph --connect-timeout=$CT daemon ${daemon} dump_ops_in_flight \
+                     > $LOG/ceph/${daemon}/ceph-daemon-ops_in_flight 2>&1
+                ceph --connect-timeout=$CT daemon ${daemon} status \
+                     > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
+                ceph --connect-timeout=$CT daemon ${daemon} dump_watchers \
+                     > $LOG/ceph/${daemon}/ceph-daemon-watchers 2>&1
+                ;;
+        esac
     done
 
     plugin_message "Cluster status dumped to ceph subdirectory"
