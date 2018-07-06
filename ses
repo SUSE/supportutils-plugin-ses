@@ -64,6 +64,14 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "timeout $CT rados df" > $LOG/ceph/rados-df 2>&1
     plugin_command "timeout $CT rbd ls" > $LOG/ceph/rbd-ls 2>&1
 
+    ceph --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
+    sed -nEe 's/^([0-9]+\.[0-9a-f]+).*/\1/p' |
+    head -n ${OPTION_SES_INACTIVE_PG_QUERY_MAX:=20} |
+    while read pg; do
+        plugin_command "timeout $((CT * 2)) ceph --connect-timeout=$CT pg $pg query" \
+                       > $LOG/ceph/ceph-pg-${pg}-query 2>&1
+    done
+
     plugin_message "Cluster status dumped to ceph subdirectory"
 else
     plugin_message "/usr/bin/ceph not found"
