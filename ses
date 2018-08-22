@@ -248,3 +248,30 @@ plugin_command "systemctl status -l 'nfs-ganesha*'"
 plugin_command "systemctl status -l 'tcmu*'"
 
 #############################################################
+section_header "prometheus log files"
+
+mkdir -p $LOG/ceph/log/prometheus
+plugin_message "All prometheus related logs copied to ceph/log/prometheus/ subdirectory"
+# node_exporter should run on every node
+plugin_command "journalctl -u prometheus-node_exporter.service" > $LOG/ceph/log/prometheus-node_exporter 2>&1
+plugin_command "systemctl status -l prometheus-node_exporter.service" > $LOG/ceph/log/prometheus/prometheus-node_exporter_systemd_status 2>&1
+if [ -x /usr/bin/prometheus ]; then
+    plugin_command "journalctl -u prometheus.service" > $LOG/ceph/log/prometheus 2>&1
+    plugin_command "systemctl status -l prometheus.service" > $LOG/ceph/log/prometheus/prometheus_systemd_status 2>&1
+    plugin_command "journalctl -u prometheus-alertmanager.service" > $LOG/ceph/log/prometheus-alertmanager 2>&1
+    plugin_command "systemctl status -l prometheus-alertmanager.service" > $LOG/ceph/log/prometheus/prometheus-alertmanager_systemd_status 2>&1
+    # the ceph exporter doesn't log anything interesting, so no journalctl call
+    plugin_command "systemctl status -l prometheus-ceph_exporter.service" > $LOG/ceph/log/prometheus/prometheus-ceph_exporter_systemd_status 2>&1
+fi
+
+#############################################################
+section_header "grafana log files"
+
+mkdir -p $LOG/ceph/log/grafana
+if [ -e /var/log/grafana/grafana.log ]; then
+    cp /var/log/grafana/* $LOG/ceph/log/grafana
+    plugin_command "systemctl status -l grafana-server.service" > $LOG/ceph/log/grafana/systemd_status 2>&1
+    plugin_message "Grafana logs copied to ceph/log/grafana/ subdirectory"
+fi
+
+#############################################################
