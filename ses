@@ -70,6 +70,7 @@ if [ -x /usr/bin/ceph ]; then
     while read pg; do
         plugin_command "timeout $((CT * 2)) ceph --connect-timeout=$CT pg $pg query" \
                        > $LOG/ceph/ceph-pg-${pg}-query 2>&1
+    done
 
     ps auxww | sed -nEe 's/^.*ceph-(mds|mgr|mon|osd) .*-id? *([^ ]*) .*/\1.\2/p' |
     while read daemon; do
