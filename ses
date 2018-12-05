@@ -265,6 +265,12 @@ if [ -x /usr/bin/prometheus ]; then
 fi
 
 #############################################################
+section_header "prometheus metrics store size"
+
+plugin_command "du -s /var/lib/prometheus/metrics" > $LOG/ceph/prometheus-du
+plugin_command "du -hs /var/lib/prometheus/metrics" >> $LOG/ceph/prometheus-du
+
+#############################################################
 section_header "grafana log files"
 
 mkdir -p $LOG/ceph/log/grafana
