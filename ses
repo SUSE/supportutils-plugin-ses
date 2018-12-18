@@ -55,6 +55,7 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "ceph --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
     plugin_command "ceph --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
     plugin_command "ceph --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
+    plugin_command "ceph --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
     plugin_command "ceph --connect-timeout=$CT auth list" |
         sed "s/\(key:\) .*/\1 $CENSORED/g" > $LOG/ceph/ceph-auth-list 2>&1
     # `ceph report` does actually include the above information, but
