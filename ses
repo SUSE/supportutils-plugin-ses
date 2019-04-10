@@ -50,6 +50,7 @@ if [ -x /usr/bin/ceph ]; then
     # timeout status commands after 5 seconds
     CT=5
     plugin_command "ceph --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
+    plugin_command "ceph --connect-timeout=$CT health detail" > $LOG/ceph/ceph-health-detail 2>&1
     plugin_command "ceph --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
     plugin_command "ceph --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
     plugin_command "ceph --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
