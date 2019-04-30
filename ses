@@ -65,8 +65,19 @@ if [ -x /usr/bin/ceph ]; then
     # remain, because their output is easier to read in a hurry ;)
     plugin_command "ceph --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
     plugin_command "timeout $CT rados df" > $LOG/ceph/rados-df 2>&1
-    plugin_command "timeout $CT rbd ls" > $LOG/ceph/rbd-ls 2>&1
     plugin_command "radosgw-admin period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
+
+    timeout $CT ceph osd pool ls detail 2>/dev/null |
+    sed -nEe "s/^.*'([^']+)'.* application rbd/\\1/p" |
+    while read pool; do
+        mkdir -p $LOG/ceph/images/$pool
+        timeout $CT rbd ls $pool 2>/dev/null | tee $LOG/ceph/images/rbd-ls-${pool} 2>&1 |
+	head -n ${OPTION_SES_RBD_INFO_MAX:=10} |
+        while read image; do
+            plugin_command "timeout $CT rbd -p $pool info $image" \
+                > $LOG/ceph/images/${pool}/rbd-info-${image} 2>&1
+        done
+    done
 
     ceph --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
     sed -nEe 's/^([0-9]+\.[0-9a-f]+).*/\1/p' |
