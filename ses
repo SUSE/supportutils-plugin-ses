@@ -47,43 +47,50 @@ section_header "Ceph cluster status"
 mkdir $LOG/ceph
 
 if [ -x /usr/bin/ceph ]; then
+    ID=
+    if ! [ -f /etc/ceph/ceph.client.admin.keyring ]; then
+        # look for available keyring file and set client id accordingly
+        ID=$(ls /etc/ceph/ceph.client.*.keyring 2>/dev/null |
+                 awk -F. '{print "--id=" $3; exit}')
+    fi
+
     # timeout status commands after 5 seconds
     CT=5
-    plugin_command "ceph --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
-    plugin_command "ceph --connect-timeout=$CT health detail" > $LOG/ceph/ceph-health-detail 2>&1
-    plugin_command "ceph --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
-    plugin_command "ceph --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
-    plugin_command "ceph --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
-    plugin_command "ceph --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
-    plugin_command "ceph --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
-    plugin_command "ceph --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
-    plugin_command "ceph --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
-    plugin_command "ceph --connect-timeout=$CT auth list" |
+    plugin_command "ceph ${ID} --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT health detail" > $LOG/ceph/ceph-health-detail 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT auth list" |
         sed "s/\(key:\) .*/\1 $CENSORED/g" > $LOG/ceph/ceph-auth-list 2>&1
     # `ceph report` does actually include the above information, but
     # in JSON format.  Since adding `ceph report`, the above commands
     # remain, because their output is easier to read in a hurry ;)
-    plugin_command "ceph --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
-    plugin_command "timeout $CT rados df" > $LOG/ceph/rados-df 2>&1
-    plugin_command "radosgw-admin period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
+    plugin_command "timeout $CT rados ${ID} df" > $LOG/ceph/rados-df 2>&1
+    plugin_command "radosgw-admin ${ID} period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
 
-    timeout $CT ceph osd pool ls detail 2>/dev/null |
+    timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
     sed -nEe "s/^.*'([^']+)'.* application rbd/\\1/p" |
     while read pool; do
         mkdir -p $LOG/ceph/images/$pool
-        timeout $CT rbd ls $pool 2>/dev/null | tee $LOG/ceph/images/rbd-ls-${pool} 2>&1 |
+        timeout $CT rbd ${ID} ls $pool 2>/dev/null | tee $LOG/ceph/images/rbd-ls-${pool} 2>&1 |
 	head -n ${OPTION_SES_RBD_INFO_MAX:=10} |
         while read image; do
-            plugin_command "timeout $CT rbd -p $pool info $image" \
+            plugin_command "timeout $CT rbd ${ID} -p $pool info $image" \
                 > $LOG/ceph/images/${pool}/rbd-info-${image} 2>&1
         done
     done
 
-    ceph --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
+    ceph ${ID} --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
     sed -nEe 's/^([0-9]+\.[0-9a-f]+).*/\1/p' |
     head -n ${OPTION_SES_INACTIVE_PG_QUERY_MAX:=20} |
     while read pg; do
-        plugin_command "timeout $((CT * 2)) ceph --connect-timeout=$CT pg $pg query" \
+        plugin_command "timeout $((CT * 2)) ceph ${ID} --connect-timeout=$CT pg $pg query" \
                        > $LOG/ceph/ceph-pg-${pg}-query 2>&1
     done
 
