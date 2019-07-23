@@ -138,8 +138,16 @@ fi
 
 if [ -x /usr/sbin/ceph-disk ]; then
     plugin_command "ceph-disk list" > $LOG/ceph/ceph-disk-list 2>&1
+elif [ -x /usr/sbin/ceph-volume ]; then
+    plugin_command "ceph-volume lvm list" > $LOG/ceph/ceph-volume-list 2>&1
 else
-    plugin_message "/usr/sbin/ceph-disk not found"
+    plugin_message "neither ceph-disk nor ceph-volume was found"
+fi
+
+if [ -d /etc/ceph/osd ]; then
+    mkdir -p $LOG/ceph/ceph-volume/simple-scan
+    cp /etc/ceph/osd/* $LOG/ceph/ceph-volume/simple-scan
+    plugin_message "ceph-volume simple scan results copied to /ceph/ceph-volume/simple-scan"
 fi
 
 #############################################################
