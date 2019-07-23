@@ -235,6 +235,16 @@ fi
 
 
 #############################################################
+section_header "deepsea cli log files"
+
+if [ -e /var/log/deepsea.log ]; then
+    mkdir -p $LOG/ceph/log/deepsea
+    cp /var/log/deepsea.log $LOG/ceph/log/deepsea/
+    plugin_message "deepsea log copied to ceph/log/deepsea subdirectory"
+fi
+
+
+#############################################################
 section_header "DeepSea salt pillar"
 
 if [ -d /srv/pillar ]; then
