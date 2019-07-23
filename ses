@@ -237,6 +237,15 @@ if [ -d /srv/pillar ]; then
 fi
 
 #############################################################
+section_header "DeepSea salt config files"
+
+if [ -d /srv/salt/ceph/configuration/ ]; then
+    mkdir -p $LOG/ceph/deepsea/configuration
+    cp -r /srv/salt/ceph/configuration/* $LOG/ceph/deepsea/configuration/
+    plugin_message "deepsea config files copied to deepsea/configuration subdirectory"
+fi
+
+#############################################################
 section_header "NFS-Ganesha config"
 
 if [ -e /etc/ganesha/ganesha.conf ]; then
