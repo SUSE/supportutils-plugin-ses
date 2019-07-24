@@ -138,8 +138,16 @@ fi
 
 if [ -x /usr/sbin/ceph-disk ]; then
     plugin_command "ceph-disk list" > $LOG/ceph/ceph-disk-list 2>&1
+elif [ -x /usr/sbin/ceph-volume ]; then
+    plugin_command "ceph-volume lvm list" > $LOG/ceph/ceph-volume-list 2>&1
 else
-    plugin_message "/usr/sbin/ceph-disk not found"
+    plugin_message "neither ceph-disk nor ceph-volume was found"
+fi
+
+if [ -d /etc/ceph/osd ]; then
+    mkdir -p $LOG/ceph/ceph-volume/simple-scan
+    cp /etc/ceph/osd/* $LOG/ceph/ceph-volume/simple-scan
+    plugin_message "ceph-volume simple scan results copied to /ceph/ceph-volume/simple-scan"
 fi
 
 #############################################################
@@ -235,12 +243,31 @@ fi
 
 
 #############################################################
+section_header "deepsea cli log files"
+
+if [ -e /var/log/deepsea.log ]; then
+    mkdir -p $LOG/ceph/log/deepsea
+    cp /var/log/deepsea.log $LOG/ceph/log/deepsea/
+    plugin_message "deepsea log copied to ceph/log/deepsea subdirectory"
+fi
+
+
+#############################################################
 section_header "DeepSea salt pillar"
 
 if [ -d /srv/pillar ]; then
     mkdir -p $LOG/ceph/deepsea/pillar
     cp -r /srv/pillar/* $LOG/ceph/deepsea/pillar/
     plugin_message "Salt pillar copied to deepsea/pillar subdirectory"
+fi
+
+#############################################################
+section_header "DeepSea salt config files"
+
+if [ -d /srv/salt/ceph/configuration/ ]; then
+    mkdir -p $LOG/ceph/deepsea/configuration
+    cp -r /srv/salt/ceph/configuration/* $LOG/ceph/deepsea/configuration/
+    plugin_message "deepsea config files copied to deepsea/configuration subdirectory"
 fi
 
 #############################################################
