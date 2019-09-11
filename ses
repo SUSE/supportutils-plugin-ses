@@ -102,6 +102,8 @@ if [ -x /usr/bin/ceph ]; then
                      > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
                 ceph --connect-timeout=$CT daemon ${daemon} status \
                      > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
+                ceph --connect-timeout=$CT daemon ${daemon} get subtrees \
+                     > $LOG/ceph/${daemon}/ceph-daemon-subtrees 2>&1
                 ;;
             mgr.*)
                 ceph --connect-timeout=$CT daemon ${daemon} status \
