@@ -94,6 +94,20 @@ if [ -x /usr/bin/ceph ]; then
                        > $LOG/ceph/ceph-pg-${pg}-query 2>&1
     done
 
+    plugin_command "ceph ${ID} --connect-timeout=$CT crash stat" \
+                   > $LOG/ceph/ceph-crash-info 2>&1
+    ceph ${ID} --connect-timeout=$CT crash ls 2>/dev/null |
+    cut -d' ' -f1 |
+    while read crashid; do
+        plugin_command "ceph ${ID} --connect-timeout=$CT crash info $crashid" \
+                       >> $LOG/ceph/ceph-crash-info 2>&1
+    done
+    # The above dumps a summary of crash information for the entire cluster.
+    # The below will dump crash logs for *this* node, if there are any.
+    if [ -n "$(find /var/lib/ceph/crash/ -type f 2>/dev/null)" ]; then
+        cp -a /var/lib/ceph/crash $LOG/ceph/
+    fi
+
     ps auxww | sed -nEe 's/^.*ceph-(mds|mgr|mon|osd) .*-id? *([^ ]*) .*/\1.\2/p' |
     while read daemon; do
         mkdir -p $LOG/ceph/$daemon
