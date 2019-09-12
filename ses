@@ -255,6 +255,16 @@ if [ -e /var/log/ganesha/ganesha.log ]; then
 fi
 
 #############################################################
+section_header "iSCSI Gateway config"
+
+if [ -x /usr/sbin/lrbd ]; then
+    mkdir -p $LOG/ceph/conf/iscsi
+    plugin_command "lrbd -o" |
+        sed "s/\(\"password[^\"]*\":\) .*$/\1 \"$CENSORED\"/g" > $LOG/ceph/conf/iscsi/lrbd-o 2>&1
+    plugin_message "lrbd -o results copied to ceph/conf/iscsi/lrbd-o"
+fi
+
+#############################################################
 section_header "Ceph related services"
 
 plugin_command "systemctl status -l 'ceph*'"
