@@ -73,6 +73,7 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "ceph ${ID} --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
     plugin_command "timeout $CT rados ${ID} df" > $LOG/ceph/rados-df 2>&1
     plugin_command "radosgw-admin ${ID} period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT telemetry status" > $LOG/ceph/ceph-telemetry-status 2>&1
 
     timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
     sed -nEe "s/^.*'([^']+)'.* application rbd/\\1/p" |
