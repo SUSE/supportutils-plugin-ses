@@ -289,6 +289,16 @@ if [ -e /var/log/ganesha/ganesha.log ]; then
 fi
 
 #############################################################
+section_header "iSCSI Gateway config"
+
+if [ -x /usr/bin/gwcli ]; then
+    mkdir -p $LOG/ceph/conf/iscsi
+    plugin_command "gwcli export" |
+        sed "s/\(password\":\) .*/\1 \"$CENSORED\"/g" > $LOG/ceph/conf/iscsi/gwcli-export 2>&1
+    plugin_message "gwcli export results copied to ceph/conf/iscsi/gwcli-export"
+fi
+
+#############################################################
 section_header "Ceph related services"
 
 plugin_command "systemctl status -l 'ceph*'"
