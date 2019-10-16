@@ -73,7 +73,6 @@ if [ -x /usr/bin/ceph ]; then
     # remain, because their output is easier to read in a hurry ;)
     plugin_command "ceph ${ID} --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
     plugin_command "timeout $CT rados ${ID} df" > $LOG/ceph/rados-df 2>&1
-    plugin_command "radosgw-admin ${ID} period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT telemetry status" > $LOG/ceph/ceph-telemetry-status 2>&1
 
     timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
@@ -87,6 +86,11 @@ if [ -x /usr/bin/ceph ]; then
                 > $LOG/ceph/images/${pool}/rbd-info-${image} 2>&1
         done
     done
+
+    timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
+        grep -q "application rgw" &&
+        plugin_command "radosgw-admin ${ID} period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
+
 
     ceph ${ID} --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
     sed -nEe 's/^([0-9]+\.[0-9a-f]+).*/\1/p' |
