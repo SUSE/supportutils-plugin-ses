@@ -62,6 +62,7 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "ceph ${ID} --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT osd pool autoscale-status" > $LOG/ceph/ceph-osd-pool-autoscale-status 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
