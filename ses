@@ -162,6 +162,7 @@ if [ -x /usr/sbin/ceph-disk ]; then
     plugin_command "ceph-disk list" > $LOG/ceph/ceph-disk-list 2>&1
 elif [ -x /usr/sbin/ceph-volume ]; then
     plugin_command "ceph-volume lvm list" > $LOG/ceph/ceph-volume-list 2>&1
+    plugin_command "ceph-volume inventory" > $LOG/ceph/ceph-volume-inventory 2>&1
 else
     plugin_message "neither ceph-disk nor ceph-volume was found"
 fi
