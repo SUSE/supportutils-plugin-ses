@@ -303,6 +303,13 @@ if [ -e /etc/ganesha/ganesha.conf ]; then
     plugin_message "NFS-Ganesha config copied to ceph/conf/ganesha/ subdirectory"
 fi
 
+if [ -x /usr/bin/salt-run ]; then
+    mkdir -p $LOG/ceph/conf/ganesha
+    plugin_command "salt-run ganesha.report" |
+        sed "s/\(secret_access_key =\) .*/\1 \"$CENSORED\";/g" > $LOG/ceph/conf/ganesha/ganesha-report 2>&1
+    plugin_message "salt-run ganesha.report results copied to ceph/conf/ganesha/ganesha-report"
+fi
+
 #############################################################
 section_header "NFS-Ganesha log files"
 
