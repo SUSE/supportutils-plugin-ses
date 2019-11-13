@@ -12,6 +12,7 @@ ceph-mgr-diskprediction-local
 ceph-mgr-rook
 ceph-mon
 ceph-osd
+ceph-prometheus-alerts
 ceph-radosgw
 deepsea
 deepsea-cli
@@ -30,6 +31,7 @@ libopenssl1_0_0
 librados2
 librbd1
 librgw2
+libtcmu2
 lrbd
 nfs-ganesha
 nfs-ganesha-ceph
@@ -39,6 +41,7 @@ patterns-ses-admin
 patterns-ses-ceph_iscsi
 patterns-ses-ceph_server
 phantomjs
+prometheus-webhook-snmp
 python3-boto
 python3-cachetools
 python3-ceph-argparse
@@ -50,7 +53,10 @@ python3-influxdb
 python3-kubernetes
 python3-oauth2client-gce
 python3-prometheus-client
+python3-pycryptodome
 python3-pyperclip
+python3-pysmi
+python3-pysnmp
 python3-rados
 python3-rbd
 python3-repoze.lru
@@ -67,4 +73,5 @@ ses-deployment_en-pdf
 ses-manual_en
 ses-release
 supportutils-plugin-ses
+tcmu-runner
 tcmu-runner-handler-rbd
