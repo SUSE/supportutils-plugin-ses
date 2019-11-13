@@ -19,8 +19,8 @@ to just do the work straight in the relevant branch.
 The file ses-rpm-list includes a list of SUSE Enterprise Storage RPMs, which
 we run `rpm -V` against.  This needs to be kept up to date with the packages
 shipped in each SES release.  To do this, mount the relevant SES DVD image,
-then run `update-rpm-list.sh`, check to ensure ses-rpm-list looks sane, then
-commit that change.
+then run `./update-rpm-list.sh /path/to/ses/media`, check to ensure
+ses-rpm-list looks sane, then commit that change.
 
 ### Packaging
 
@@ -28,6 +28,8 @@ supportutils-plugin-ses is packaged as an RPM.  Maintenance of the spec file
 and changelogs happens in IBS with changelogs auto-generated from git commits.
 There's a Makefile in IBS to help with packaging, so once you've checked out
 the supportutils-plugin-ses package from IBS, running `make` will pull in the
-latest updates from github, then it's just `isc ar ; isc ci` to commit the
-change to the IBS project.  Do check the changelog though and ensure it looks
-clean, and tweak if necessary.
+latest updates from the appropriate github branch, then it's just
+`isc ar ; isc ci` to commit the change to the IBS project.  Do check the
+changelog though and ensure it looks clean, and tweak if necessary.  For
+example, you can safely delete entries that are uninteresting to users
+of supportconfig, such as "Further tweaks to README.md".
