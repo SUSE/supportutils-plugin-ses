@@ -58,6 +58,7 @@ if [ -x /usr/bin/ceph ]; then
     CT=5
     plugin_command "ceph ${ID} --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT health detail" > $LOG/ceph/ceph-health-detail 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT config dump" > $LOG/ceph/ceph-config-dump 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
