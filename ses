@@ -66,7 +66,9 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "ceph ${ID} --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd pool autoscale-status" > $LOG/ceph/ceph-osd-pool-autoscale-status 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT fs dump -f json-pretty" > $LOG/ceph/ceph-fs-dump.json 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT pg dump -f json-pretty" > $LOG/ceph/ceph-pg-dump.json 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT auth list" 2>&1 |
         grep -v 'installed auth entries' |
@@ -166,6 +168,7 @@ if [ -x /usr/sbin/ceph-disk ]; then
     plugin_command "ceph-disk list" > $LOG/ceph/ceph-disk-list 2>&1
 elif [ -x /usr/sbin/ceph-volume ]; then
     plugin_command "ceph-volume lvm list" > $LOG/ceph/ceph-volume-list 2>&1
+    plugin_command "ceph-volume inventory --format json-pretty" > $LOG/ceph/ceph-volume-inventory.json 2>&1
     plugin_command "ceph-volume inventory" > $LOG/ceph/ceph-volume-inventory 2>&1
 else
     plugin_message "neither ceph-disk nor ceph-volume was found"
