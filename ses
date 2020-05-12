@@ -206,6 +206,19 @@ if [ -d /var/log/ceph ]; then
 fi
 
 #############################################################
+section_header "ceph-salt config"
+
+if [ -f /var/log/ceph-salt.log ]; then
+    cp /var/log/ceph-salt.log $LOG/ceph/log/
+    plugin_message "ceph-salt.log copied to ceph/log/ceph-salt.log"
+fi
+if [ -x /usr/bin/ceph-salt ]; then
+    plugin_command "ceph-salt export -p " |
+        sed "s/\(password\":\|private_key\":\) .*\(\"\)/\1 \"$CENSORED\"/g" > $LOG/ceph/conf/ceph-salt-export 2>&1
+    plugin_message "ceph-salt export results copied to ceph/conf/ceph-salt-export"
+fi
+
+#############################################################
 section_header "Salt config"
 
 if [ -d /etc/salt ]; then
