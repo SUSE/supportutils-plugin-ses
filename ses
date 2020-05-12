@@ -201,8 +201,22 @@ section_header "Ceph log files"
 
 if [ -d /var/log/ceph ]; then
     mkdir -p $LOG/ceph/log/ceph
-    cp /var/log/ceph/* $LOG/ceph/log/ceph/
+    # Copy any files directly in /var/log/ceph (e.g. /var/log/ceph/cephadm.log),
+    # or in any subdirectory (containerized daemons may log to /var/log/ceph/$FSID)
+    find /var/log/ceph -type f -exec cp '{}' $LOG/ceph/log/ceph ';'
     plugin_message "Ceph logs copied to ceph/log subdirectory"
+fi
+
+if [ -x /usr/sbin/cephadm ]; then
+    cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
+    while read fsid name ; do
+        mkdir -p $LOG/ceph/log/ceph
+        # Individual daemon logs from journalctl named without the leading "ceph-"
+        # string to avoid any conflict with possible log files already copied.
+        plugin_command cephadm logs --fsid $fsid --name $name > $LOG/ceph/log/ceph/$name.log 2>&1
+    done
+else
+    plugin_message "/usr/sbin/cephadm not found"
 fi
 
 #############################################################
@@ -283,36 +297,9 @@ plugin_command "systemctl status -l 'nfs-ganesha*'"
 plugin_command "systemctl status -l 'tcmu*'"
 
 #############################################################
-section_header "prometheus log files"
-
-mkdir -p $LOG/ceph/log/prometheus
-plugin_message "All prometheus related logs copied to ceph/log/prometheus/ subdirectory"
-# node_exporter should run on every node
-plugin_command "journalctl -u prometheus-node_exporter.service" > $LOG/ceph/log/prometheus/prometheus-node_exporter 2>&1
-plugin_command "systemctl status -l prometheus-node_exporter.service" > $LOG/ceph/log/prometheus/prometheus-node_exporter_systemd_status 2>&1
-if [ -x /usr/bin/prometheus ]; then
-    plugin_command "journalctl -u prometheus.service" > $LOG/ceph/log/prometheus/prometheus 2>&1
-    plugin_command "systemctl status -l prometheus.service" > $LOG/ceph/log/prometheus/prometheus_systemd_status 2>&1
-    plugin_command "journalctl -u prometheus-alertmanager.service" > $LOG/ceph/log/prometheus/prometheus-alertmanager 2>&1
-    plugin_command "systemctl status -l prometheus-alertmanager.service" > $LOG/ceph/log/prometheus/prometheus-alertmanager_systemd_status 2>&1
-    # the ceph exporter doesn't log anything interesting, so no journalctl call
-    plugin_command "systemctl status -l prometheus-ceph_exporter.service" > $LOG/ceph/log/prometheus/prometheus-ceph_exporter_systemd_status 2>&1
-fi
-
-#############################################################
 section_header "prometheus metrics store size"
 
 plugin_command "du -s /var/lib/prometheus/metrics" > $LOG/ceph/prometheus-du
 plugin_command "du -hs /var/lib/prometheus/metrics" >> $LOG/ceph/prometheus-du
-
-#############################################################
-section_header "grafana log files"
-
-mkdir -p $LOG/ceph/log/grafana
-if [ -e /var/log/grafana/grafana.log ]; then
-    cp /var/log/grafana/* $LOG/ceph/log/grafana
-    plugin_command "systemctl status -l grafana-server.service" > $LOG/ceph/log/grafana/systemd_status 2>&1
-    plugin_message "Grafana logs copied to ceph/log/grafana/ subdirectory"
-fi
 
 #############################################################
