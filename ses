@@ -204,53 +204,6 @@ if [ -d /var/log/ceph ]; then
     cp /var/log/ceph/* $LOG/ceph/log/ceph/
     plugin_message "Ceph logs copied to ceph/log subdirectory"
 fi
-# Depending on how radosgw is configured, its log files may
-# be in /var/log/ceph/ (and thus captured above), or may be in
-# /var/log/radosgw (which is what the ceph barclamp configures
-# for crowbar deploys
-if [ -d /var/log/radosgw ]; then
-    mkdir -p $LOG/ceph/log/radosgw
-    cp /var/log/radosgw/* $LOG/ceph/log/radosgw/
-fi
-# /var/log/ceph-radosgw/ was also used at some point in the past
-if [ -d /var/log/ceph-radosgw ]; then
-    mkdir -p $LOG/ceph/log/ceph-radosgw
-    cp /var/log/ceph-radosgw/* $LOG/ceph/log/ceph-radosgw/
-fi
-
-#############################################################
-section_header "Calamari log files"
-
-if [ -d /var/log/calamari ]; then
-    mkdir -p $LOG/ceph/log/calamari
-    cp /var/log/calamari/*.log $LOG/ceph/log/calamari/
-    plugin_message "Calamari logs copied to ceph/log subdirectory"
-fi
-
-#############################################################
-section_header "openATTIC version"
-
-if [ -x /usr/sbin/oaconfig ]; then
-    plugin_command "/usr/sbin/oaconfig version" 2>&1
-fi
-
-#############################################################
-section_header "openATTIC config files"
-
-if [ -d /etc/openattic ]; then
-    mkdir -p $LOG/ceph/conf/openattic
-    cp -a /etc/openattic/* $LOG/ceph/conf/openattic/
-    plugin_message "openATTIC config copied to ceph/conf/openattic/ subdirectory"
-fi
-
-#############################################################
-section_header "openATTIC log files"
-
-if [ -d /var/log/openattic ]; then
-    mkdir -p $LOG/ceph/log/openattic
-    cp /var/log/openattic/* $LOG/ceph/log/openattic/
-    plugin_message "openATTIC logs copied to ceph/log/openattic/ subdirectory"
-fi
 
 #############################################################
 section_header "Salt config"
@@ -272,34 +225,6 @@ if [ -d /var/log/salt ]; then
     plugin_message "Salt logs copied to ceph/log/salt subdirectory"
 fi
 
-
-#############################################################
-section_header "deepsea cli log files"
-
-if [ -e /var/log/deepsea.log ]; then
-    mkdir -p $LOG/ceph/log/deepsea
-    cp /var/log/deepsea.log $LOG/ceph/log/deepsea/
-    plugin_message "deepsea log copied to ceph/log/deepsea subdirectory"
-fi
-
-
-#############################################################
-section_header "DeepSea salt pillar"
-
-if [ -d /srv/pillar ]; then
-    mkdir -p $LOG/ceph/deepsea/pillar
-    cp -r /srv/pillar/* $LOG/ceph/deepsea/pillar/
-    plugin_message "Salt pillar copied to deepsea/pillar subdirectory"
-fi
-
-#############################################################
-section_header "DeepSea salt config files"
-
-if [ -d /srv/salt/ceph/configuration/ ]; then
-    mkdir -p $LOG/ceph/deepsea/configuration
-    cp -r /srv/salt/ceph/configuration/* $LOG/ceph/deepsea/configuration/
-    plugin_message "deepsea config files copied to deepsea/configuration subdirectory"
-fi
 
 #############################################################
 section_header "NFS-Ganesha config"
