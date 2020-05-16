@@ -137,9 +137,9 @@ if [ -n "${CEPH_SHELL}" ]; then
 
     # The above dumps a summary of crash information for the entire cluster.
     # The below will dump crash logs for *this* node, if there are any.
-    if [ -n "$(find /var/lib/ceph/crash/ -type f 2>/dev/null)" ]; then
-        cp -a /var/lib/ceph/crash $LOG/ceph/
-    fi
+    for crash in /var/lib/ceph/*/crash ; do
+        [ -d $crash ] && cp -a $crash $LOG/ceph/
+    done
 
     if [ -x "$(which cephadm 2>/dev/null)" ] ; then
         cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
