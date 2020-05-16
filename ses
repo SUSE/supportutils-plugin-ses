@@ -291,7 +291,14 @@ fi
 #############################################################
 section_header "Ceph related services"
 
-plugin_command "systemctl status -l 'ceph*'"
+if [ -x /usr/sbin/cephadm ]; then
+    cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
+    while read fsid name ; do
+        plugin_command "systemctl status -l ceph-$fsid@$name.service"
+    done
+else
+    plugin_message "/usr/sbin/cephadm not found"
+fi
 plugin_command "systemctl status -l 'salt*'"
 plugin_command "systemctl status -l 'nfs-ganesha*'"
 plugin_command "systemctl status -l 'tcmu*'"
