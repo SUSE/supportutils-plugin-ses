@@ -246,6 +246,17 @@ else
 fi
 
 #############################################################
+section_header "podman images in use"
+
+if [ -x "$(which podman 2>/dev/null)" ]; then
+    plugin_command "podman images"
+    plugin_command "podman ps -a --format json | jq '.[].Image'"
+else
+    plugin_message "podman not found"
+fi
+
+
+#############################################################
 section_header "ceph-salt config"
 
 if [ -f /var/log/ceph-salt.log ]; then
