@@ -98,6 +98,14 @@ if [ -n "${CEPH_SHELL}" ]; then
         plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT telemetry status" > $LOG/ceph/ceph-telemetry-status 2>&1
         plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT balancer status" > $LOG/ceph/ceph-balancer-status 2>&1
 
+        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch status" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT cephadm get-ssh-config" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch host ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch ps --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch device ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch upgrade status" >> $LOG/ceph/ceph-orch-status 2>&1
+
         ${CEPH_SHELL} timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
         sed -nEe "s/^.*'([^']+)'.* application rbd/\\1/p" |
         while read pool; do
