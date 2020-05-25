@@ -154,15 +154,16 @@ if [ -n "${CEPH_SHELL}" ]; then
     if [ -x "$(which cephadm 2>/dev/null)" ] ; then
         cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
         while read container_id daemon state; do
-            [[ "$daemon" =~ ^(mon|mgr|mds|osd) ]] || continue
             [[ "$state" == "running" ]] || continue
 
             mkdir -p $LOG/ceph/$daemon
 
-            cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} config show \
-                 > $LOG/ceph/${daemon}/ceph-daemon-config 2>&1
-            cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} perf dump \
-                 > $LOG/ceph/${daemon}/ceph-daemon-perf 2>&1
+            if [[ "$daemon" =~ ^(mon|mgr|mds|osd) ]] ; then
+                cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} config show \
+                     > $LOG/ceph/${daemon}/ceph-daemon-config 2>&1
+                cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} perf dump \
+                     > $LOG/ceph/${daemon}/ceph-daemon-perf 2>&1
+            fi
 
             case $daemon in
                 mds.*)
@@ -190,6 +191,18 @@ if [ -n "${CEPH_SHELL}" ]; then
                          > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
                     cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_watchers \
                          > $LOG/ceph/${daemon}/ceph-daemon-watchers 2>&1
+                    ;;
+                nfs.*)
+                    plugin_command "cephadm enter --name ${daemon} -- cat /etc/ganesha/ganesha.conf" \
+                        > $LOG/ceph/${daemon}/ganesha-config 2>&1
+                    NFS_USER=$(grep -m 1 'UserId =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
+                    NFS_POOL=$(grep -m 1 'pool =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
+                    NFS_NS=$(grep -m 1 'namespace =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
+                    for o in $(cephadm enter --name ${daemon} -- rados --id "${NFS_USER}" --pool "${NFS_POOL}" --namespace "${NFS_NS}" ls 2>/dev/null) ; do
+                        [[ "$o" =~ ^(conf-|export-) ]] || continue
+                        plugin_command "cephadm enter --name ${daemon} -- rados --id '${NFS_USER}' --pool '${NFS_POOL}' --namespace '${NFS_NS}' get $o -" 2>&1 |
+                            sed "s/\(secret_access_key = \"\).*\(\"\)/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/ganesha-config
+                    done
                     ;;
             esac
         done
@@ -299,32 +312,6 @@ if [ -d /var/log/salt ]; then
     plugin_message "Salt logs copied to ceph/log/salt subdirectory"
 fi
 
-
-#############################################################
-section_header "NFS-Ganesha config"
-
-if [ -e /etc/ganesha/ganesha.conf ]; then
-    mkdir -p $LOG/ceph/conf/ganesha
-    cp /etc/ganesha/ganesha.conf $LOG/ceph/conf/ganesha/
-    plugin_message "NFS-Ganesha config copied to ceph/conf/ganesha/ subdirectory"
-fi
-
-if [ -x /usr/bin/salt-run ]; then
-    mkdir -p $LOG/ceph/conf/ganesha
-    plugin_command "salt-run ganesha.report" |
-        sed "s/\(secret_access_key =\) .*/\1 \"$CENSORED\";/g" > $LOG/ceph/conf/ganesha/ganesha-report 2>&1
-    plugin_message "salt-run ganesha.report results copied to ceph/conf/ganesha/ganesha-report"
-fi
-
-#############################################################
-section_header "NFS-Ganesha log files"
-
-if [ -e /var/log/ganesha/ganesha.log ]; then
-    mkdir -p $LOG/ceph/log/ganesha
-    cp /var/log/ganesha/* $LOG/ceph/log/ganesha/
-    plugin_message "NFS-Ganesha logs copied to ceph/log/ganesha/ subdirectory"
-fi
-
 #############################################################
 section_header "iSCSI Gateway config"
 
@@ -347,7 +334,6 @@ else
     plugin_message "cephadm not found"
 fi
 plugin_command "systemctl status -l 'salt*'"
-plugin_command "systemctl status -l 'nfs-ganesha*'"
 plugin_command "systemctl status -l 'tcmu*'"
 
 #############################################################
