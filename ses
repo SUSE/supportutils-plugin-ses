@@ -48,7 +48,9 @@ mkdir $LOG/ceph
 
 if [ -x "$(which cephadm 2>/dev/null)" ] ; then
     CEPH_SHELL="cephadm shell --"
-    plugin_command "cephadm ls" > $LOG/ceph/cephadm-ls 2>&1
+    plugin_command "cephadm ls" >> $LOG/ceph/cephadm-status 2>&1
+    plugin_command "cephadm check-host" >> $LOG/ceph/cephadm-status 2>&1
+    plugin_command "cephadm inspect-image" >> $LOG/ceph/cephadm-status 2>&1
 else
     plugin_message "cephadm not found"
 fi
