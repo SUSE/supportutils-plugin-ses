@@ -204,6 +204,10 @@ if [ -n "${CEPH_SHELL}" ]; then
                             sed "s/\(secret_access_key = \"\).*\(\"\)/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/ganesha-config
                     done
                     ;;
+                iscsi.*)
+                    plugin_command "cephadm enter --name ${daemon} -- gwcli export" 2>&1 |
+                        sed "s/\(password\": \"\).*\"/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/gwcli-export
+                    ;;
             esac
         done
     fi
@@ -313,16 +317,6 @@ if [ -d /var/log/salt ]; then
 fi
 
 #############################################################
-section_header "iSCSI Gateway config"
-
-if [ -x /usr/bin/gwcli ]; then
-    mkdir -p $LOG/ceph/conf/iscsi
-    plugin_command "gwcli export" |
-        sed "s/\(password\":\) .*/\1 \"$CENSORED\"/g" > $LOG/ceph/conf/iscsi/gwcli-export 2>&1
-    plugin_message "gwcli export results copied to ceph/conf/iscsi/gwcli-export"
-fi
-
-#############################################################
 section_header "Ceph related services"
 
 if [ -x "$(which cephadm 2>/dev/null)" ]; then
@@ -334,7 +328,6 @@ else
     plugin_message "cephadm not found"
 fi
 plugin_command "systemctl status -l 'salt*'"
-plugin_command "systemctl status -l 'tcmu*'"
 
 #############################################################
 section_header "prometheus metrics store size"
