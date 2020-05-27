@@ -58,16 +58,10 @@ fi
 # TODO: for k8s/rook support, set CEPH_SHELL appropriately here
 
 if [ -n "${CEPH_SHELL}" ]; then
-    ID=
-    if ! [ -f /etc/ceph/ceph.client.admin.keyring ]; then
-        # look for available keyring file and set client id accordingly
-        ID=$(ls /etc/ceph/ceph.client.*.keyring 2>/dev/null |
-                 awk -F. '{print "--id=" $3; exit}')
-    fi
     # timeout status commands after 5 seconds
     CT=5
 
-    plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
+    plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
     if [ "$?" -eq "0" ]; then
         # None of the following will actually work without ceph.conf present
         # on the host, and a valid keyring.  Calling `ceph -s` above as a test
@@ -75,70 +69,70 @@ if [ -n "${CEPH_SHELL}" ]; then
         # error message in plugin-ses.txt if not (for example:
         # "/etc/ceph/ceph.conf not found")
 
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT versions" > $LOG/ceph/ceph-versions 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT health detail" > $LOG/ceph/ceph-health-detail 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT config dump" > $LOG/ceph/ceph-config-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT mgr dump" > $LOG/ceph/ceph-mgr-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT osd pool autoscale-status" > $LOG/ceph/ceph-osd-pool-autoscale-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT fs dump -f json-pretty" > $LOG/ceph/ceph-fs-dump.json 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT pg dump -f json-pretty" > $LOG/ceph/ceph-pg-dump.json 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT auth list" 2>&1 |
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT versions" > $LOG/ceph/ceph-versions 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT health detail" > $LOG/ceph/ceph-health-detail 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT config dump" > $LOG/ceph/ceph-config-dump 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT mgr dump" > $LOG/ceph/ceph-mgr-dump 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd pool autoscale-status" > $LOG/ceph/ceph-osd-pool-autoscale-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT fs dump -f json-pretty" > $LOG/ceph/ceph-fs-dump.json 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT pg dump -f json-pretty" > $LOG/ceph/ceph-pg-dump.json 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT auth list" 2>&1 |
             grep -v 'installed auth entries' |
             sed "s/\(key:\) .*/\1 $CENSORED/g" > $LOG/ceph/ceph-auth-list
         # `ceph report` does actually include the above information, but
         # in JSON format.  Since adding `ceph report`, the above commands
         # remain, because their output is easier to read in a hurry ;)
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
-        plugin_command "${CEPH_SHELL} timeout $CT rados ${ID} df" > $LOG/ceph/rados-df 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT telemetry status" > $LOG/ceph/ceph-telemetry-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT balancer status" > $LOG/ceph/ceph-balancer-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
+        plugin_command "${CEPH_SHELL} timeout $CT rados df" > $LOG/ceph/rados-df 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT telemetry status" > $LOG/ceph/ceph-telemetry-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT balancer status" > $LOG/ceph/ceph-balancer-status 2>&1
 
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch status" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT cephadm get-ssh-config" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch host ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch ps --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch device ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT orch upgrade status" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch status" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT cephadm get-ssh-config" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch host ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch ps --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch device ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch upgrade status" >> $LOG/ceph/ceph-orch-status 2>&1
 
-        ${CEPH_SHELL} timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
+        ${CEPH_SHELL} timeout $CT ceph osd pool ls detail 2>/dev/null |
         sed -nEe "s/^.*'([^']+)'.* application rbd/\\1/p" |
         while read pool; do
             mkdir -p $LOG/ceph/images/$pool
-            ${CEPH_SHELL} timeout $CT rbd ${ID} ls $pool 2>/dev/null | tee $LOG/ceph/images/rbd-ls-${pool} 2>&1 |
+            ${CEPH_SHELL} timeout $CT rbd ls $pool 2>/dev/null | tee $LOG/ceph/images/rbd-ls-${pool} 2>&1 |
 	    head -n ${OPTION_SES_RBD_INFO_MAX:=10} |
             while read image; do
-                plugin_command "${CEPH_SHELL} timeout $CT rbd ${ID} -p $pool info $image" \
+                plugin_command "${CEPH_SHELL} timeout $CT rbd -p $pool info $image" \
                     > $LOG/ceph/images/${pool}/rbd-info-${image} 2>&1
             done
         done
 
-        ${CEPH_SHELL} timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
+        ${CEPH_SHELL} timeout $CT ceph osd pool ls detail 2>/dev/null |
             grep -q "application rgw" &&
-            plugin_command "${CEPH_SHELL} radosgw-admin ${ID} period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
+            plugin_command "${CEPH_SHELL} radosgw-admin period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
 
 
-        ${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
+        ${CEPH_SHELL} ceph --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
         sed -nEe 's/^([0-9]+\.[0-9a-f]+).*/\1/p' |
         head -n ${OPTION_SES_INACTIVE_PG_QUERY_MAX:=20} |
         while read pg; do
-            plugin_command "${CEPH_SHELL} timeout $((CT * 2)) ceph ${ID} --connect-timeout=$CT pg $pg query" \
+            plugin_command "${CEPH_SHELL} timeout $((CT * 2)) ceph --connect-timeout=$CT pg $pg query" \
                            > $LOG/ceph/ceph-pg-${pg}-query 2>&1
         done
 
-        plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT crash stat" \
+        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT crash stat" \
                        > $LOG/ceph/ceph-crash-info 2>&1
-        ${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT crash ls 2>/dev/null |
+        ${CEPH_SHELL} ceph --connect-timeout=$CT crash ls 2>/dev/null |
         cut -d' ' -f1 |
         while read crashid; do
-            plugin_command "${CEPH_SHELL} ceph ${ID} --connect-timeout=$CT crash info $crashid" \
+            plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT crash info $crashid" \
                            >> $LOG/ceph/ceph-crash-info 2>&1
         done
     else
