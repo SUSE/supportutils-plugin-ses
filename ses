@@ -208,6 +208,12 @@ if [ -n "${CEPH_SHELL}" ]; then
                     plugin_command "cephadm enter --name ${daemon} -- gwcli export" 2>&1 |
                         sed "s/\(password\": \"\).*\"/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/gwcli-export
                     ;;
+                prometheus.*)
+                    # cephadm configures the prometheus container to store
+                    # metrics in /prometheus, not /var/lib/prometheus/metrics
+                    plugin_command "cephadm enter --name ${daemon} -- du -s /prometheus" > $LOG/ceph/${daemon}/prometheus-du
+                    plugin_command "cephadm enter --name ${daemon} -- du -hs /prometheus" >> $LOG/ceph/${daemon}/prometheus-du
+
             esac
         done
     fi
@@ -328,11 +334,5 @@ else
     plugin_message "cephadm not found"
 fi
 plugin_command "systemctl status -l 'salt*'"
-
-#############################################################
-section_header "prometheus metrics store size"
-
-plugin_command "du -s /var/lib/prometheus/metrics" > $LOG/ceph/prometheus-du
-plugin_command "du -hs /var/lib/prometheus/metrics" >> $LOG/ceph/prometheus-du
 
 #############################################################
