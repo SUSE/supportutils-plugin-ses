@@ -114,9 +114,12 @@ if [ -n "${CEPH_SHELL}" ]; then
             done
         done
 
-        ${CEPH_SHELL} timeout $CT ceph osd pool ls detail 2>/dev/null |
-            grep -q "application rgw" &&
+        if ${CEPH_SHELL} timeout $CT ceph osd pool ls detail 2>/dev/null | grep -q "application rgw"; then
             plugin_command "${CEPH_SHELL} radosgw-admin period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
+            plugin_command "${CEPH_SHELL} radosgw-admin bucket stats" > $LOG/ceph/radosgw-admin-bucket-stats 2>&1
+            plugin_command "${CEPH_SHELL} radosgw-admin bucket limit check" >> $LOG/ceph/radosgw-admin-bucket-stats 2>&1
+            plugin_command "${CEPH_SHELL} radosgw-admin metadata list bucket.instance" >> $LOG/ceph/radosgw-admin-bucket-stats 2>&1
+        fi
 
 
         ${CEPH_SHELL} ceph --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
