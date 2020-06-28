@@ -92,10 +92,12 @@ if [ -x /usr/bin/ceph ]; then
         done
     done
 
-    timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null |
-        grep -q "application rgw" &&
+    if timeout $CT ceph ${ID} osd pool ls detail 2>/dev/null | grep -q "application rgw"; then
         plugin_command "radosgw-admin ${ID} period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
-
+        plugin_command "radosgw-admin ${ID} bucket stats" > $LOG/ceph/radosgw-admin-bucket-stats 2>&1
+        plugin_command "radosgw-admin ${ID} bucket limit check" >> $LOG/ceph/radosgw-admin-bucket-stats 2>&1
+        plugin_command "radosgw-admin ${ID} metadata list bucket.instance" >> $LOG/ceph/radosgw-admin-bucket-stats 2>&1
+    fi
 
     ceph ${ID} --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
     sed -nEe 's/^([0-9]+\.[0-9a-f]+).*/\1/p' |
