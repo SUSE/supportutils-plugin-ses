@@ -333,3 +333,34 @@ fi
 plugin_command "systemctl status -l 'salt*'"
 
 #############################################################
+section_header "LIO iSCSI"
+
+if [ -d "/sys/kernel/config/target/" ]; then
+    # For LIO we're interesting in the following ConfigFS paths:
+    # (1) backstore device attributes
+    # (2) backstore ALUA state
+    # (3) whether a backstore is enabled
+    # (4) iSCSI LUNs with their corresponding backstore device symlink
+    # (5) iSCSI transport layer attributes
+    # (6) iSCSI transport layer parameters
+    # (7) whether an iSCSI TPGT is enabled
+    find /sys/kernel/config/target \
+         -path "*/core/*/*/attrib/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/core/*/*/alua/*/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/core/*/*/enable" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/iscsi/*/lun/*" -type l \
+         -printf '%p: %l\n' \
+         -or -path "*/iscsi/*/tpgt_*/attrib/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/iscsi/*/tpgt_*/param/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/iscsi/*/tpgt_*/enable" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';'
+else
+    plugin_message "LIO ConfigFS path not found"
+fi
+
+#############################################################
