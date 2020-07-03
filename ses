@@ -34,6 +34,15 @@ validate_rpm_if_installed() {
     echo
 }
 
+function command_in_path {
+    local cmd="$1"
+    if type "$cmd" >/dev/null 2>&1 ; then
+        echo "yes"
+    else
+        echo ""
+    fi
+}
+
 #############################################################
 section_header "Supportconfig Plugin for SUSE Enterprise Storage, v${SVER}"
 rpm_list=/usr/lib/supportconfig/resources/ses-rpm-list
@@ -46,7 +55,7 @@ section_header "Ceph cluster status"
 
 mkdir $LOG/ceph
 
-if [ -x "$(which cephadm 2>/dev/null)" ] ; then
+if [ "$(command_in_path cephadm)" ] ; then
     CEPH_SHELL="cephadm shell --"
     plugin_command "cephadm ls" >> $LOG/ceph/cephadm-status 2>&1
     plugin_command "cephadm check-host" >> $LOG/ceph/cephadm-status 2>&1
@@ -148,7 +157,7 @@ if [ -n "${CEPH_SHELL}" ]; then
         [ -d $crash ] && cp -a $crash $LOG/ceph/
     done
 
-    if [ -x "$(which cephadm 2>/dev/null)" ] ; then
+    if [ "$(command_in_path cephadm)" ] ; then
         cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
         while read container_id daemon state; do
             [[ "$state" == "running" ]] || continue
@@ -218,7 +227,7 @@ if [ -n "${CEPH_SHELL}" ]; then
     plugin_message "Cluster status dumped to ceph subdirectory"
 fi
 
-if [ -x "$(which cephadm 2>/dev/null)" ] ; then
+if [ "$(command_in_path cephadm)" ] ; then
     # `cephadm ceph-volume` dumps ceph-volume output to stderr prefixed with
     # INFO:cephadm:/usr/bin/podman:stdout, so grepping that junk out to avoid
     # duplicating the output.
@@ -263,7 +272,7 @@ if [ -d /var/log/ceph ]; then
     plugin_message "Ceph logs copied to ceph/log subdirectory"
 fi
 
-if [ -x "$(which cephadm 2>/dev/null)" ]; then
+if [ "$(command_in_path cephadm)" ]; then
     cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
     while read fsid name ; do
         mkdir -p $LOG/ceph/log/ceph
@@ -278,7 +287,7 @@ fi
 #############################################################
 section_header "podman images in use"
 
-if [ -x "$(which podman 2>/dev/null)" ]; then
+if [ "$(command_in_path podman)" ]; then
     plugin_command "podman images"
     plugin_command "podman ps -a --format json | jq '.[].Image'"
 else
@@ -293,7 +302,7 @@ if [ -f /var/log/ceph-salt.log ]; then
     cp /var/log/ceph-salt.log $LOG/ceph/log/
     plugin_message "ceph-salt.log copied to ceph/log/ceph-salt.log"
 fi
-if [ -x "$(which ceph-salt 2>/dev/null)" ]; then
+if [ "$(command_presnet ceph-salt)" ]; then
     plugin_command "ceph-salt export -p " |
         sed "s/\(password\":\|private_key\":\) .*\(\"\)/\1 \"$CENSORED\"/g" > $LOG/ceph/conf/ceph-salt-export 2>&1
     plugin_message "ceph-salt export results copied to ceph/conf/ceph-salt-export"
@@ -322,7 +331,7 @@ fi
 #############################################################
 section_header "Ceph related services"
 
-if [ -x "$(which cephadm 2>/dev/null)" ]; then
+if [ "$(command_in_path cephadm)" ]; then
     cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
     while read fsid name ; do
         plugin_command "systemctl status -l ceph-$fsid@$name.service"
