@@ -1,0 +1,232 @@
+#!/bin/bash
+
+# ONLY SUPPORTS ENVIRONMENTS WHERE ROOK OPERATOR AND CEPH CLUSTER ARE IN SAME NAMESPACE
+
+export ROOKLOG="$LOGCEPH"/rook
+mkdir "$ROOKLOG"
+
+# shellcheck source=ses-resources/
+source "$SES_RESOURCES_DIR"/rook-helpers.sh
+
+
+#############################################################
+section_header "Kubernetes cluster information"
+KUBELOG="$LOGCEPH"/kubernetes
+mkdir "$KUBELOG"/
+
+plugin_message "Collecting general Kubernetes information relevant to Rook > $KUBELOG/..."
+plugin_message "" # newline
+
+if ! [ -x "$(command -v $KUBECTL)" ]; then
+    echo "ERROR: kubectl does not exist"
+    exit 1 # cannot collect any Rook info w/o kubectl
+fi
+
+if ! plugin_command "$KUBECTL version" &> "$KUBELOG"/kube-version; then
+    echo "ERROR: kubectl cannot connect to a Kubernetes cluster"
+    exit 1 # cannot collect any Rook info w/o a K8s cluster connection
+fi
+
+{
+    section_header "nodes overview"
+    plugin_command "$KUBECTL get nodes --show-labels" 2>&1
+    resource_detail "" nodes 2>&1
+} > "$KUBELOG"/nodes
+
+resource_overview "" namespaces > "$KUBELOG"/namespaces 2>&1
+
+resource_overview_and_detail "" crds > "$KUBELOG"/crds 2>&1
+resource_overview_and_detail "" podsecuritypolicies > "$KUBELOG"/podsecuritypolicies 2>&1
+
+# Get a dump of "all" resources in the kube-system namespace. This should be info CaaSP is
+# collecting, but for non-CaaSP environments, this can help us determine if there is something like
+# a CNI failure underlying whatever failure Rook-Ceph is experiencing.
+resource_overview_and_detail "kube-system" "all" > "$KUBELOG"/kube-system-resurces
+
+#############################################################
+section_header "Rook-Ceph cluster information"
+
+if ! $KUBECTL get namespaces | grep -q "^${ROOK_NAMESPACE}[[:space:]]"; then
+    echo "ERROR: Rook namespace '$ROOK_NAMESPACE' does not exist"
+    exit 1 # cannot collect any Rook info if no Rook cluster exists
+fi
+
+#############################################################
+
+RSRCLOG="$ROOKLOG"/resources
+mkdir "$RSRCLOG"
+
+plugin_message "Collecting Kubernetes Resource information for cluster $ROOK_NAMESPACE > $RSRCLOG/..."
+plugin_message "" # newline
+
+resource_overview_and_detail "$ROOK_NAMESPACE" pods > "$RSRCLOG"/pods 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" replicasets > "$RSRCLOG"/replicasets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" deployments > "$RSRCLOG"/deployments 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" "jobs" > "$RSRCLOG"/jobs 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" daemonsets > "$RSRCLOG"/daemonsets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" statefulsets > "$RSRCLOG"/statefulsets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" configmaps > "$RSRCLOG"/configmaps 2>&1
+# TODO: does detail on secrets reveal too much secure info about a customer?
+resource_overview "$ROOK_NAMESPACE" secrets > "$RSRCLOG"/secrets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" services > "$RSRCLOG"/services 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" clusterroles > "$RSRCLOG"/clusterroles 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" clusterrolebindings > "$RSRCLOG"/clusterrolebindings 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" roles > "$RSRCLOG"/roles 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" rolebindings > "$RSRCLOG"/rolebindings 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" serviceaccounts > "$RSRCLOG"/serviceaccounts 2>&1
+
+ROOK_SHELL="${KUBECTL_ROOK:?} exec -t deploy/rook-ceph-operator --"
+
+plugin_message "Collecting Rook-Ceph Operator information for cluster $ROOK_NAMESPACE > $ROOKLOG/operator"
+plugin_message "" # newline
+{
+    selector="--selector 'app=rook-ceph-operator'"
+    section_header "Rook operator Pod details for cluster $ROOK_NAMESPACE"
+    plugin_command "$KUBECTL_ROOK get pod $selector --output=yaml" 2>&1
+    plugin_command "$KUBECTL_ROOK get replicaset $selector --output=yaml" 2>&1
+    plugin_command "$KUBECTL_ROOK get deployment rook-ceph-operator --output=yaml" 2>&1
+    section_header "Rook operator internal details for cluster $ROOK_NAMESPACE"
+    plugin_command "$ROOK_SHELL rook version" 2>&1
+    plugin_command "$ROOK_SHELL ls --recursive /var/lib/rook" 2>&1
+    plugin_command "$ROOK_SHELL cat /var/lib/rook/*/*.config" 2>&1
+    # TODO: does this reveal too much secure info about a customer?
+    # plugin_command "$ROOK_SHELL cat /var/lib/rook/*/*.keyring" 2>&1
+    plugin_command "$ROOK_SHELL ls --recursive /etc/ceph" 2>&1
+} > "$ROOKLOG"/operator
+
+plugin_command "$ROOK_SHELL rook version" > "$ROOKLOG"/rook-version 2>&1
+
+#############################################################
+CRLOG="$ROOKLOG"/custom-resources
+mkdir "$CRLOG"
+
+plugin_message "Collecting Rook-Ceph Custom Resources for cluster $ROOK_NAMESPACE > $CRLOG/..."
+
+crds_json="$($KUBECTL get crds --output=json)"
+crds="$(echo "$crds_json" | jq -r '.items[].metadata.name')"
+for crd in $crds; do
+    if [[ "$crd" == *.rook.io ]] || [[ "$crd" == *.objectbucket.io ]]; then
+        resources="$($KUBECTL_ROOK get "$crd" --output=name)"
+        for resource in $resources; do
+        # each resource is, e.g., cephcluster.rook.io/rook-ceph
+        logfile="${resource//\//_}" # replace '/' char with '_' for log file name
+        plugin_message "  found Custom Resource $resource"
+        resource_overview_and_detail "$ROOK_NAMESPACE" "$resource" > "$CRLOG"/"$logfile"
+        done
+    fi
+done
+plugin_message "" # newline
+
+
+#############################################################
+section_header "Ceph cluster status"
+
+# Determine which Rook image the cluster is using for the collector helper
+operator_json="$($KUBECTL_ROOK get deployment rook-ceph-operator --output=json)"
+ROOK_IMAGE="$(echo "$operator_json" | jq -r '.spec.template.spec.containers[0].image')"
+
+plugin_message "Starting Rook-Ceph cluster collector helper Pod"
+plugin_message "  namespace: $ROOK_NAMESPACE"
+plugin_message "  image:     $ROOK_IMAGE"
+plugin_message "" # newline
+if ! start_collector_helper "$ROOK_NAMESPACE" "$ROOK_IMAGE"; then
+    exit 1 # need collector to get more info than this; fail if we can't continue
+fi
+# always try to remove the collector helper on script exit
+trap stop_collector_helper EXIT
+
+collect_info_from_ceph_cli "$COLLECTOR_SHELL"
+
+
+#############################################################
+section_header "Rook-Ceph Pod inspection"
+PODLOG="$ROOKLOG"/pod-logs
+mkdir "$PODLOG"
+
+plugin_message "Collecting Rook-Ceph Pod logs > $PODLOG/..."
+plugin_message ""
+
+plugin_message "Collecting Ceph daemon logs > $LOGCEPHLOG/..."
+plugin_message ""
+
+plugin_message "Collecting detailed Ceph daemon info > $LOGDAEMON/<daemon>/..."
+plugin_message ""
+
+pods_json="$($KUBECTL_ROOK get pods --output=json)"
+# We want to list running pods first followed by non-running pods because Rook can be running more
+# than one pod for a given daemon in the case where an old pod is Terminating and a new one is
+# Running or Pending.
+jq_data='"\(.metadata.name) \(.metadata.labels.ceph_daemon_type) \(.metadata.labels.ceph_daemon_id) \(.status.phase)"'
+running_pods="$(echo "$pods_json" | jq -r ".items[] | select(.status.phase==\"Running\") | $jq_data")"
+notrunning_pods="$(echo "$pods_json" | jq -r ".items[] | select(.status.phase!=\"Running\") | $jq_data")"
+{ echo "$running_pods" ; echo "$notrunning_pods" ; } |
+    while read pod dtype did phase; do
+        plugin_message "  found Pod $pod"
+
+        podlog="$PODLOG/$pod.log"
+        pod_logs "$ROOK_NAMESPACE" "$pod" > "$podlog" 2>&1
+
+        daemon=""
+        if [[ "$dtype" != "null" ]] && [[ "$did" != "null" ]]; then
+            daemon="$dtype.$did"
+        fi
+
+        if [[ "$phase" != "Running" ]] && [[ -n "$daemon" ]]; then
+            plugin_message "    Pod is not running (is $phase) for daemon $daemon"
+        fi
+
+        # A list of all Rook pods' logs is useful and easy to create. We also want to output daemon
+        # logs in the same format as cephadm so the output is easier to use. Make the
+        # cephadm-equivalent daemon log files symlink to Rook's pod logs to save space.
+        if [[ -n "$daemon" ]]; then
+            mkdir --parents "$LOGCEPHLOG"
+            if [[ "$phase" = "Running" ]]; then
+                # Assume the default log should be the Pod which is Running.
+                log="$LOGCEPHLOG/$daemon"
+            else
+                # If the pod isn't running, note it's status phase in the log file name.
+                log="$LOGCEPHLOG/$daemon.$phase"
+            fi
+            # It's possible there are multiple pods in any given state. Append a number to the log
+            # file until we get a unique log file name.
+            (( i=1 ))
+            log_orig="$log" # remember original log name for appending numbers
+            until [[ ! -e "$log.log" ]]; do
+                (( i+=1 ))
+                log="$log_orig($i)"
+            done
+            plugin_message "    logs for daemon $daemon > $log.log"
+            make_link "$podlog" "$log.log"
+        fi
+
+        if [[ "$phase" = "Running" ]] && [[ -n "$daemon" ]]; then
+            # some Rook daemons set CEPH_ARGS, which needs to be unset for 'ceph daemon' commands
+            # fix any such case by resetting the whole env with 'env -i'
+            container_shell="$KUBECTL_ROOK exec $pod -- env -i"
+
+            collect_info_from_daemon "$daemon" "$container_shell"
+        fi
+
+    done
+
+
+#############################################################
+section_header "Rook log files"
+
+plugin_message "Collecting Rook log files on disk > $LOGCEPHLOG/..."
+
+if cluster_json="$($KUBECTL_ROOK get CephCluster "$ROOK_NAMESPACE" --output=json)"; then
+    dataDirHostPath="$(echo "$cluster_json" | jq -r '.spec.dataDirHostPath')"
+else
+    dataDirHostPath="/var/lib/rook" # default dataDirHostPath for Rook
+fi
+
+rook_log_dir="$dataDirHostPath"/"$ROOK_NAMESPACE"/log/
+plugin_message "  looking in $rook_log_dir"
+plugin_message "" # newline
+
+if [ -d "$rook_log_dir" ]; then
+    mkdir -p "$LOGCEPHLOG"
+    # Copy any files directly in /var/log/ceph (e.g. /var/log/ceph/cephadm.log),
+    find "$rook_log_dir" -type f -exec cp '{}' "$LOGCEPHLOG" ';'
+fi

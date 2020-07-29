@@ -1,0 +1,170 @@
+#!/bin/bash
+
+# Source this to run cephadm-specific validations
+# for the SUSE Enterprise Storage supportutils plugin
+
+#############################################################
+section_header "Ceph cluster status"
+
+CEPH_SHELL="cephadm shell --"
+
+{
+    plugin_command "cephadm ls" 2>&1
+    plugin_command "cephadm check-host" 2>&1
+    plugin_command "cephadm inspect-image" 2>&1
+} > "$LOGCEPH"/cephadm-status
+
+collect_info_from_ceph_cli "$CEPH_SHELL"
+
+# The above dumps a summary of crash information for the entire cluster.
+# The below will dump crash logs for *this* node, if there are any.
+for crash in /var/lib/ceph/*/crash ; do
+    [ -d "$crash" ] && cp -a "$crash" "$LOGCEPH"/crash
+done
+
+cephadm ls | jq -r '.[] | "\(.name) \(.state)"' |
+    while read daemon state; do
+        [[ "$state" == "running" ]] || continue
+
+        container_shell="cephadm enter --name $daemon --"
+
+        collect_info_from_daemon "$daemon" "$container_shell"
+    done
+
+plugin_message "Cluster status dumped to ceph subdirectory"
+
+# `cephadm ceph-volume` dumps ceph-volume output to stderr prefixed with
+# INFO:cephadm:/usr/bin/podman:stdout, so grepping that junk out to avoid
+# duplicating the output.
+plugin_command "cephadm ceph-volume lvm list" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$LOGCEPH"/ceph-volume-list
+plugin_command "cephadm ceph-volume inventory -- --format json-pretty" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$LOGCEPH"/ceph-volume-inventory.json
+plugin_command "cephadm ceph-volume inventory" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$LOGCEPH"/ceph-volume-inventory
+
+if [ -d /etc/ceph/osd ]; then
+    mkdir -p "$LOGCEPH"/ceph-volume/simple-scan
+    cp /etc/ceph/osd/* "$LOGCEPH"/ceph-volume/simple-scan
+    plugin_message "ceph-volume simple scan results copied to /ceph/ceph-volume/simple-scan"
+fi
+
+#############################################################
+section_header "Ceph config"
+
+if [ -d /etc/ceph ]; then
+    if files=$(find /etc/ceph -type f | grep --extended-regexp --invert-match '.keyring$'); then
+        if [ -n "$files" ]; then
+            mkdir "$LOGCEPH"/conf
+            for f in $files ; do
+                pconf_files "$f" > "$LOGCEPH"/conf/"$(basename "$f")"
+            done
+            plugin_message "Ceph config copied to ceph/conf subdirectory"
+        fi
+    fi
+else
+    plugin_message "/etc/ceph directory not found"
+fi
+
+#############################################################
+section_header "Ceph log files"
+
+if [ -d /var/log/ceph ]; then
+    mkdir -p "$LOGCEPHLOG"
+    # Copy any files directly in /var/log/ceph (e.g. /var/log/ceph/cephadm.log),
+    # or in any subdirectory (containerized daemons may log to /var/log/ceph/$FSID)
+    find /var/log/ceph -type f -exec cp '{}' "$LOGCEPHLOG" ';'
+    plugin_message "Ceph logs copied to ceph/log subdirectory"
+fi
+
+cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
+    while read fsid name ; do
+        mkdir -p "$LOGCEPHLOG"
+        # Individual daemon logs from journalctl named without the leading "ceph-"
+        # string to avoid any conflict with possible log files already copied.
+        plugin_command cephadm logs --fsid "$fsid" --name "$name" > "$LOGCEPHLOG/$name.log" 2>&1
+    done
+
+
+#############################################################
+section_header "podman images in use"
+
+if command -v podman 2>/dev/null; then
+    plugin_command "podman images"
+    plugin_command "podman ps -a --format json | jq '.[].Image'"
+else
+    plugin_message "podman not found"
+fi
+
+
+#############################################################
+section_header "ceph-salt config"
+
+if [ -f /var/log/ceph-salt.log ]; then
+    cp /var/log/ceph-salt.log "$LOGCEPH"/log/
+    plugin_message "ceph-salt.log copied to ceph/log/ceph-salt.log"
+fi
+if command -v ceph-salt 2>/dev/null; then
+    plugin_command "ceph-salt export -p " |
+        sed "s/\(password\":\|private_key\":\) .*\(\"\)/\1 \"$CENSORED\"/g" > "$LOGCEPH"/conf/ceph-salt-export 2>&1
+    plugin_message "ceph-salt export results copied to ceph/conf/ceph-salt-export"
+fi
+
+#############################################################
+section_header "Salt config"
+
+if [ -d /etc/salt ]; then
+    if files=$(find /etc/salt -type f | grep --extended-regexp --invert-match '.pem$'); then
+        if [ -n "$files" ]; then
+            pconf_files "$files"
+        fi
+    fi
+fi
+
+#############################################################
+section_header "Salt log files"
+
+if [ -d /var/log/salt ]; then
+    mkdir -p "$LOGCEPH"/log/salt
+    cp /var/log/salt/{master,minion} "$LOGCEPH"/log/salt/
+    plugin_message "Salt logs copied to ceph/log/salt subdirectory"
+fi
+
+#############################################################
+section_header "Ceph related services"
+
+cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
+    while read fsid name ; do
+        plugin_command "systemctl status -l ceph-$fsid@$name.service"
+    done
+plugin_command "systemctl status -l 'salt*'"
+
+#############################################################
+section_header "LIO iSCSI"
+
+if [ -d "/sys/kernel/config/target/" ]; then
+    # For LIO we're interesting in the following ConfigFS paths:
+    # (1) backstore device attributes
+    # (2) backstore ALUA state
+    # (3) whether a backstore is enabled
+    # (4) iSCSI LUNs with their corresponding backstore device symlink
+    # (5) iSCSI transport layer attributes
+    # (6) iSCSI transport layer parameters
+    # (7) whether an iSCSI TPGT is enabled
+    find /sys/kernel/config/target \
+         -path "*/core/*/*/attrib/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/core/*/*/alua/*/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/core/*/*/enable" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/iscsi/*/lun/*" -type l \
+         -printf '%p: %l\n' \
+         -or -path "*/iscsi/*/tpgt_*/attrib/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/iscsi/*/tpgt_*/param/*" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';' \
+         -or -path "*/iscsi/*/tpgt_*/enable" -type f \
+         -printf '%p: ' -exec 'cat' '{}' ';'
+else
+    plugin_message "LIO ConfigFS path not found"
+fi
+
+#############################################################
