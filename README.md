@@ -33,3 +33,11 @@ latest updates from the appropriate github branch, then it's just
 changelog though and ensure it looks clean, and tweak if necessary.  For
 example, you can safely delete entries that are uninteresting to users
 of supportconfig, such as "Further tweaks to README.md".
+
+### The resources dir
+
+For local development, it can be helpful to run so the plugin doesn't need to be installed locally
+or modified manually for local development and testing.
+```sh
+export SES_RESOURCES_DIR=./ses-resources
+```

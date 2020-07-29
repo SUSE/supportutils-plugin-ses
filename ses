@@ -10,357 +10,44 @@
 
 SVER=1.0.0
 RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
-LOG_LINES=5000  # 0 means include the entire file
-CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
+export SES_RESOURCES_DIR=${SES_RESOURCES_DIR:-"/usr/lib/supportconfig/resources/ses/"} # override only for development
+export LOG_LINES=5000  # 0 means include the entire file
+export CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
 
 [ -s $RCFILE ] && . $RCFILE || { echo "ERROR: Initializing resource file: $RCFILE"; exit 1; }
 
-# Helper functions liberated from Matt Barringer's supportutils-plugin-susecloud
-validate_rpm_if_installed() {
-    thisrpm="$1"
-    echo "#==[ Validating RPM ]=================================#"
-    if rpm -q "$thisrpm" >/dev/null 2>&1; then
-        echo "# rpm -V $thisrpm"
+source "$SES_RESOURCES_DIR"/helpers.sh
 
-        if rpm -V "$thisrpm"; then
-            echo "Status: Passed"
-        else
-            echo "Status: WARNING"
-        fi
-    else
-        echo "package $thisrpm is not installed"
-        echo "Status: Skipped"
-    fi
-    echo
-}
+#############################################################
+# TUNABLES
+
+export OPTION_SES_BACKEND="${OPTION_SES_BACKEND:-cephadm}"
+
+export OPTION_SES_INACTIVE_PG_QUERY_MAX="${OPTION_SES_INACTIVE_PG_QUERY_MAX:-20}"
+export OPTION_SES_RBD_INFO_MAX="${OPTION_SES_RBD_INFO_MAX:-10}"
+
+# Tunables specifically for OPTION_SES_BACKEND="cephadm"
+
+# Tunables specifically for OPTION_SES_BACKEND="rook" (not yet supported)
+
 
 #############################################################
 section_header "Supportconfig Plugin for SUSE Enterprise Storage, v${SVER}"
-rpm_list=/usr/lib/supportconfig/resources/ses-rpm-list
-for thisrpm in $(cat "$rpm_list"); do
-    validate_rpm_if_installed "$thisrpm"
-done
 
-#############################################################
-section_header "Ceph cluster status"
-
-mkdir $LOG/ceph
-
-if [ -x "$(which cephadm 2>/dev/null)" ] ; then
-    CEPH_SHELL="cephadm shell --"
-    plugin_command "cephadm ls" >> $LOG/ceph/cephadm-status 2>&1
-    plugin_command "cephadm check-host" >> $LOG/ceph/cephadm-status 2>&1
-    plugin_command "cephadm inspect-image" >> $LOG/ceph/cephadm-status 2>&1
-else
-    plugin_message "cephadm not found"
-fi
-
-# TODO: for k8s/rook support, set CEPH_SHELL appropriately here
-
-if [ -n "${CEPH_SHELL}" ]; then
-    # timeout status commands after 5 seconds
-    CT=5
-
-    plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT -s" > $LOG/ceph/ceph-status 2>&1
-    if [ "$?" -eq "0" ]; then
-        # None of the following will actually work without ceph.conf present
-        # on the host, and a valid keyring.  Calling `ceph -s` above as a test
-        # gives us actual ceph status if everything is working, or a helpful
-        # error message in plugin-ses.txt if not (for example:
-        # "/etc/ceph/ceph.conf not found")
-
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT versions" > $LOG/ceph/ceph-versions 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT health detail" > $LOG/ceph/ceph-health-detail 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT config dump" > $LOG/ceph/ceph-config-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT mgr dump" > $LOG/ceph/ceph-mgr-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT osd pool autoscale-status" > $LOG/ceph/ceph-osd-pool-autoscale-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT df detail" > $LOG/ceph/ceph-df-detail 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT fs dump -f json-pretty" > $LOG/ceph/ceph-fs-dump.json 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT fs dump" > $LOG/ceph/ceph-fs-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT pg dump -f json-pretty" > $LOG/ceph/ceph-pg-dump.json 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT pg dump" > $LOG/ceph/ceph-pg-dump 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT auth list" 2>&1 |
-            grep -v 'installed auth entries' |
-            sed "s/\(key:\) .*/\1 $CENSORED/g" > $LOG/ceph/ceph-auth-list
-        # `ceph report` does actually include the above information, but
-        # in JSON format.  Since adding `ceph report`, the above commands
-        # remain, because their output is easier to read in a hurry ;)
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT report" > $LOG/ceph/ceph-report 2>&1
-        plugin_command "${CEPH_SHELL} timeout $CT rados df" > $LOG/ceph/rados-df 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT telemetry status" > $LOG/ceph/ceph-telemetry-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT balancer status" > $LOG/ceph/ceph-balancer-status 2>&1
-
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch status" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT cephadm get-ssh-config" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch host ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch ps --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch device ls --format yaml" >> $LOG/ceph/ceph-orch-status 2>&1
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT orch upgrade status" >> $LOG/ceph/ceph-orch-status 2>&1
-
-        ${CEPH_SHELL} timeout $CT ceph osd pool ls detail 2>/dev/null |
-        sed -nEe "s/^.*'([^']+)'.* application rbd/\\1/p" |
-        while read pool; do
-            mkdir -p $LOG/ceph/images/$pool
-            ${CEPH_SHELL} timeout $CT rbd ls $pool 2>/dev/null | tee $LOG/ceph/images/rbd-ls-${pool} 2>&1 |
-	    head -n ${OPTION_SES_RBD_INFO_MAX:=10} |
-            while read image; do
-                plugin_command "${CEPH_SHELL} timeout $CT rbd -p $pool info $image" \
-                    > $LOG/ceph/images/${pool}/rbd-info-${image} 2>&1
-            done
-        done
-
-        if ${CEPH_SHELL} timeout $CT ceph osd pool ls detail 2>/dev/null | grep -q "application rgw"; then
-            plugin_command "${CEPH_SHELL} radosgw-admin period get" > $LOG/ceph/radosgw-admin-period-get 2>&1
-            plugin_command "${CEPH_SHELL} radosgw-admin bucket stats" > $LOG/ceph/radosgw-admin-bucket-stats 2>&1
-            plugin_command "${CEPH_SHELL} radosgw-admin bucket limit check" >> $LOG/ceph/radosgw-admin-bucket-stats 2>&1
-            plugin_command "${CEPH_SHELL} radosgw-admin metadata list bucket.instance" >> $LOG/ceph/radosgw-admin-bucket-stats 2>&1
-        fi
-
-
-        ${CEPH_SHELL} ceph --connect-timeout=$CT pg dump_stuck inactive 2>/dev/null |
-        sed -nEe 's/^([0-9]+\.[0-9a-f]+).*/\1/p' |
-        head -n ${OPTION_SES_INACTIVE_PG_QUERY_MAX:=20} |
-        while read pg; do
-            plugin_command "${CEPH_SHELL} timeout $((CT * 2)) ceph --connect-timeout=$CT pg $pg query" \
-                           > $LOG/ceph/ceph-pg-${pg}-query 2>&1
-        done
-
-        plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT crash stat" \
-                       > $LOG/ceph/ceph-crash-info 2>&1
-        ${CEPH_SHELL} ceph --connect-timeout=$CT crash ls 2>/dev/null |
-        cut -d' ' -f1 |
-        while read crashid; do
-            plugin_command "${CEPH_SHELL} ceph --connect-timeout=$CT crash info $crashid" \
-                           >> $LOG/ceph/ceph-crash-info 2>&1
-        done
-    else
-        plugin_message "ceph -s failed (missing ceph.conf or admin keyring on host?)"
-    fi
-
-    # The above dumps a summary of crash information for the entire cluster.
-    # The below will dump crash logs for *this* node, if there are any.
-    for crash in /var/lib/ceph/*/crash ; do
-        [ -d $crash ] && cp -a $crash $LOG/ceph/
-    done
-
-    if [ -x "$(which cephadm 2>/dev/null)" ] ; then
-        cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
-        while read container_id daemon state; do
-            [[ "$state" == "running" ]] || continue
-
-            mkdir -p $LOG/ceph/$daemon
-
-            if [[ "$daemon" =~ ^(mon|mgr|mds|osd) ]] ; then
-                cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} config show \
-                     > $LOG/ceph/${daemon}/ceph-daemon-config 2>&1
-                cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} perf dump \
-                     > $LOG/ceph/${daemon}/ceph-daemon-perf 2>&1
-            fi
-
-            case $daemon in
-                mds.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
-                         > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} status \
-                         > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} get subtrees \
-                         > $LOG/ceph/${daemon}/ceph-daemon-subtrees 2>&1
-                    ;;
-                mgr.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} status \
-                         > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
-                    ;;
-                mon.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
-                         > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
-                    ;;
-                osd.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
-                         > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_ops_in_flight \
-                         > $LOG/ceph/${daemon}/ceph-daemon-ops_in_flight 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} status \
-                         > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_watchers \
-                         > $LOG/ceph/${daemon}/ceph-daemon-watchers 2>&1
-                    ;;
-                nfs.*)
-                    plugin_command "cephadm enter --name ${daemon} -- cat /etc/ganesha/ganesha.conf" \
-                        > $LOG/ceph/${daemon}/ganesha-config 2>&1
-                    NFS_USER=$(grep -m 1 'UserId =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
-                    NFS_POOL=$(grep -m 1 'pool =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
-                    NFS_NS=$(grep -m 1 'namespace =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
-                    for o in $(cephadm enter --name ${daemon} -- rados --id "${NFS_USER}" --pool "${NFS_POOL}" --namespace "${NFS_NS}" ls 2>/dev/null) ; do
-                        [[ "$o" =~ ^(conf-|export-) ]] || continue
-                        plugin_command "cephadm enter --name ${daemon} -- rados --id '${NFS_USER}' --pool '${NFS_POOL}' --namespace '${NFS_NS}' get $o -" 2>&1 |
-                            sed "s/\(secret_access_key = \"\).*\(\"\)/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/ganesha-config
-                    done
-                    ;;
-                iscsi.*)
-                    plugin_command "cephadm enter --name ${daemon} -- gwcli export" 2>&1 |
-                        sed "s/\(password\": \"\).*\"/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/gwcli-export
-                    ;;
-                prometheus.*)
-                    # cephadm configures the prometheus container to store
-                    # metrics in /prometheus, not /var/lib/prometheus/metrics
-                    plugin_command "cephadm enter --name ${daemon} -- du -s /prometheus" > $LOG/ceph/${daemon}/prometheus-du
-                    plugin_command "cephadm enter --name ${daemon} -- du -hs /prometheus" >> $LOG/ceph/${daemon}/prometheus-du
-
-            esac
-        done
-    fi
-
-    plugin_message "Cluster status dumped to ceph subdirectory"
-fi
-
-if [ -x "$(which cephadm 2>/dev/null)" ] ; then
-    # `cephadm ceph-volume` dumps ceph-volume output to stderr prefixed with
-    # INFO:cephadm:/usr/bin/podman:stdout, so grepping that junk out to avoid
-    # duplicating the output.
-    plugin_command "cephadm ceph-volume lvm list" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-list
-    plugin_command "cephadm ceph-volume inventory -- --format json-pretty" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory.json
-    plugin_command "cephadm ceph-volume inventory" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory
-else
-    plugin_message "cephadm not found"
-fi
-
-if [ -d /etc/ceph/osd ]; then
-    mkdir -p $LOG/ceph/ceph-volume/simple-scan
-    cp /etc/ceph/osd/* $LOG/ceph/ceph-volume/simple-scan
-    plugin_message "ceph-volume simple scan results copied to /ceph/ceph-volume/simple-scan"
-fi
-
-#############################################################
-section_header "Ceph config"
-
-if [ -d /etc/ceph ]; then
-    if files=$(find /etc/ceph -type f | egrep -v '.keyring$'); then
-        if [ -n "$files" ]; then
-            mkdir $LOG/ceph/conf
-            for f in $files ; do
-                pconf_files $f > $LOG/ceph/conf/$(basename $f)
-            done
-            plugin_message "Ceph config copied to ceph/conf subdirectory"
-        fi
-    fi
-else
-    plugin_message "/etc/ceph directory not found"
-fi
-
-#############################################################
-section_header "Ceph log files"
-
-if [ -d /var/log/ceph ]; then
-    mkdir -p $LOG/ceph/log/ceph
-    # Copy any files directly in /var/log/ceph (e.g. /var/log/ceph/cephadm.log),
-    # or in any subdirectory (containerized daemons may log to /var/log/ceph/$FSID)
-    find /var/log/ceph -type f -exec cp '{}' $LOG/ceph/log/ceph ';'
-    plugin_message "Ceph logs copied to ceph/log subdirectory"
-fi
-
-if [ -x "$(which cephadm 2>/dev/null)" ]; then
-    cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
-    while read fsid name ; do
-        mkdir -p $LOG/ceph/log/ceph
-        # Individual daemon logs from journalctl named without the leading "ceph-"
-        # string to avoid any conflict with possible log files already copied.
-        plugin_command cephadm logs --fsid $fsid --name $name > $LOG/ceph/log/ceph/$name.log 2>&1
-    done
-else
-    plugin_message "cephadm not found"
-fi
-
-#############################################################
-section_header "podman images in use"
-
-if [ -x "$(which podman 2>/dev/null)" ]; then
-    plugin_command "podman images"
-    plugin_command "podman ps -a --format json | jq '.[].Image'"
-else
-    plugin_message "podman not found"
-fi
-
-
-#############################################################
-section_header "ceph-salt config"
-
-if [ -f /var/log/ceph-salt.log ]; then
-    cp /var/log/ceph-salt.log $LOG/ceph/log/
-    plugin_message "ceph-salt.log copied to ceph/log/ceph-salt.log"
-fi
-if [ -x "$(which ceph-salt 2>/dev/null)" ]; then
-    plugin_command "ceph-salt export -p " |
-        sed "s/\(password\":\|private_key\":\) .*\(\"\)/\1 \"$CENSORED\"/g" > $LOG/ceph/conf/ceph-salt-export 2>&1
-    plugin_message "ceph-salt export results copied to ceph/conf/ceph-salt-export"
-fi
-
-#############################################################
-section_header "Salt config"
-
-if [ -d /etc/salt ]; then
-    if files=$(find /etc/salt -type f | egrep -v '.pem$'); then
-        if [ -n "$files" ]; then
-            pconf_files $files
-        fi
-    fi
-fi
-
-#############################################################
-section_header "Salt log files"
-
-if [ -d /var/log/salt ]; then
-    mkdir -p $LOG/ceph/log/salt
-    cp /var/log/salt/{master,minion} $LOG/ceph/log/salt/
-    plugin_message "Salt logs copied to ceph/log/salt subdirectory"
-fi
-
-#############################################################
-section_header "Ceph related services"
-
-if [ -x "$(which cephadm 2>/dev/null)" ]; then
-    cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
-    while read fsid name ; do
-        plugin_command "systemctl status -l ceph-$fsid@$name.service"
-    done
-else
-    plugin_message "cephadm not found"
-fi
-plugin_command "systemctl status -l 'salt*'"
-
-#############################################################
-section_header "LIO iSCSI"
-
-if [ -d "/sys/kernel/config/target/" ]; then
-    # For LIO we're interesting in the following ConfigFS paths:
-    # (1) backstore device attributes
-    # (2) backstore ALUA state
-    # (3) whether a backstore is enabled
-    # (4) iSCSI LUNs with their corresponding backstore device symlink
-    # (5) iSCSI transport layer attributes
-    # (6) iSCSI transport layer parameters
-    # (7) whether an iSCSI TPGT is enabled
-    find /sys/kernel/config/target \
-         -path "*/core/*/*/attrib/*" -type f \
-         -printf '%p: ' -exec 'cat' '{}' ';' \
-         -or -path "*/core/*/*/alua/*/*" -type f \
-         -printf '%p: ' -exec 'cat' '{}' ';' \
-         -or -path "*/core/*/*/enable" -type f \
-         -printf '%p: ' -exec 'cat' '{}' ';' \
-         -or -path "*/iscsi/*/lun/*" -type l \
-         -printf '%p: %l\n' \
-         -or -path "*/iscsi/*/tpgt_*/attrib/*" -type f \
-         -printf '%p: ' -exec 'cat' '{}' ';' \
-         -or -path "*/iscsi/*/tpgt_*/param/*" -type f \
-         -printf '%p: ' -exec 'cat' '{}' ';' \
-         -or -path "*/iscsi/*/tpgt_*/enable" -type f \
-         -printf '%p: ' -exec 'cat' '{}' ';'
-else
-    plugin_message "LIO ConfigFS path not found"
-fi
-
-#############################################################
+# This top-level script is mostly an entrypoint which takes user inputs and calls out to the
+# necessary resources to collect logs based on that input
+case $OPTION_SES_BACKEND in
+cephadm)
+    plugin_message "SES backend: cephadm"
+    plugin_message "" # newline
+    source "$SES_RESOURCES_DIR"/cephadm
+    ;;
+rook)
+    print_error "SES backend '$OPTION_SES_BACKEND' is known but not yet supported"
+    exit 1
+    ;;
+*)
+    print_error "SES backend '$OPTION_SES_BACKEND' is not known or supported"
+    exit 1
+    ;;
+esac

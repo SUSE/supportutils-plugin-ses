@@ -11,4 +11,4 @@ SES_MEDIA_DIR=${1:-/srv/nfs/media/SUSE-Enterprise-Storage/}
 find $SES_MEDIA_DIR -name *.rpm | \
 	sed 's/.*\///; s/-[0-9.~+A-Za-z_]\+-[0-9.]\+\.\(x86_64\|noarch\)\.rpm$//' | \
 	grep -v '\.src\.rpm$' | \
-	sort > ses-rpm-list
+	sort > ses-resources/rpm-list
