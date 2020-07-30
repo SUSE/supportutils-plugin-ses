@@ -18,17 +18,27 @@ export CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
 
 source "$SES_RESOURCES_DIR"/helpers.sh
 
+export CEPHLOG="$LOG"/ceph
+mkdir --parents "$CEPHLOG"
+
 #############################################################
 # TUNABLES
+# User-facing tunables should be of the form OPTION_SES_
+# and should have a default value set.
+# Internal variables can be named differently. Example below:
+#   export INTERNAL_VAR="${OPTION_SES_USER_OPTION:-default}"
 
-export OPTION_SES_BACKEND="${OPTION_SES_BACKEND:-cephadm}"
+export SES_BACKEND="${OPTION_SES_BACKEND:-cephadm}"
 
 export OPTION_SES_INACTIVE_PG_QUERY_MAX="${OPTION_SES_INACTIVE_PG_QUERY_MAX:-20}"
 export OPTION_SES_RBD_INFO_MAX="${OPTION_SES_RBD_INFO_MAX:-10}"
+export CT=${OPTION_SES_CEPH_CONNECT_TIMEOUT_SECONDS:-5}
 
 # Tunables specifically for OPTION_SES_BACKEND="cephadm"
 
 # Tunables specifically for OPTION_SES_BACKEND="rook" (not yet supported)
+export KUBECTL="${OPTION_SES_KUBECTL_CMD:-kubectl}"
+export ROOK_NAMESPACE="${OPTION_SES_ROOK_NAMESPACE:-rook-ceph}"
 
 
 #############################################################
@@ -36,18 +46,20 @@ section_header "Supportconfig Plugin for SUSE Enterprise Storage, v${SVER}"
 
 # This top-level script is mostly an entrypoint which takes user inputs and calls out to the
 # necessary resources to collect logs based on that input
-case $OPTION_SES_BACKEND in
+case $SES_BACKEND in
 cephadm)
     plugin_message "SES backend: cephadm"
     plugin_message "" # newline
     source "$SES_RESOURCES_DIR"/cephadm
     ;;
 rook)
-    print_error "SES backend '$OPTION_SES_BACKEND' is known but not yet supported"
+    plugin_message "SES backend: rook"
+    plugin_message "" # newline
+    source "$SES_RESOURCES_DIR"/rook
     exit 1
     ;;
 *)
-    print_error "SES backend '$OPTION_SES_BACKEND' is not known or supported"
+    print_error "SES backend '$SES_BACKEND' is not known or supported"
     exit 1
     ;;
 esac
