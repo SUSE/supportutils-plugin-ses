@@ -18,8 +18,14 @@ export CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
 
 source "$SES_RESOURCES_DIR"/helpers.sh
 
+# base log dir for all logs from the SES supportutils plugin
 export CEPHLOG="$LOG"/ceph
 mkdir --parents "$CEPHLOG"
+
+# log dir for all Ceph daemon-specific information
+export DAEMONLOG="$CEPHLOG"/daemon
+mkdir "$DAEMONLOG"
+
 
 #############################################################
 # TUNABLES
@@ -39,6 +45,10 @@ export CT=${OPTION_SES_CEPH_CONNECT_TIMEOUT_SECONDS:-5}
 # Tunables specifically for OPTION_SES_BACKEND="rook" (not yet supported)
 export KUBECTL="${OPTION_SES_KUBECTL_CMD:-kubectl}"
 export ROOK_NAMESPACE="${OPTION_SES_ROOK_NAMESPACE:-rook-ceph}"
+
+
+#############################################################
+export CEPH="ceph --connect-timeout=$CT"
 
 
 #############################################################

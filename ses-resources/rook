@@ -1,18 +1,11 @@
 #!/bin/bash
 
-if [[ "${BASH_VERSINFO:-0}" -lt 4 ]]; then
-    echo "ERROR: Bash 4 or greater is required to run this script"
-    exit 1
-fi
+# ONLY SUPPORTS ENVIRONMENTS WHERE ROOK OPERATOR AND CEPH CLUSTER ARE IN SAME NAMESPACE
 
 export ROOKLOG="$CEPHLOG"/rook
 mkdir "$ROOKLOG"
 
 source "$SES_RESOURCES_DIR"/rook-helpers.sh
-
-
-#############################################################
-CEPH="ceph --connect-timeout=$CT"
 
 
 #############################################################
@@ -30,16 +23,19 @@ if ! plugin_command "$KUBECTL version" &> "$KUBELOG"/kube-version; then
     exit 1 # cannot collect any Rook info w/o a K8s cluster connection
 fi
 
+plugin_message "Collecting general Kubernetes information relevant to Rook > $KUBELOG/"
+plugin_message "" # newline
+
 {
     section_header "nodes overview"
     plugin_command "$KUBECTL get nodes --show-labels" 2>&1
     resource_detail "" nodes 2>&1
-} >> "$KUBELOG"/nodes
+} > "$KUBELOG"/nodes
 
-resource_overview "" namespaces >> "$KUBELOG"/namespaces 2>&1
+resource_overview "" namespaces > "$KUBELOG"/namespaces 2>&1
 
-resource_overview_and_detail "" crds >> "$KUBELOG"/crds 2>&1
-resource_overview_and_detail "" podsecuritypolicies >> "$KUBELOG"/podsecuritypolicies 2>&1
+resource_overview_and_detail "" crds > "$KUBELOG"/crds 2>&1
+resource_overview_and_detail "" podsecuritypolicies > "$KUBELOG"/podsecuritypolicies 2>&1
 
 
 #############################################################
@@ -50,29 +46,33 @@ if ! $KUBECTL get namespaces | grep -q "^${ROOK_NAMESPACE}[[:space:]]"; then
     exit 1 # cannot collect any Rook info if no Rook cluster exists
 fi
 
-# ONLY SUPPORTS ENVIRONMENTS WHERE ROOK OPERATOR AND CEPH CLUSTER ARE IN SAME NAMESPACE
+#############################################################
 
-plugin_message "Collecting Kubernetes Resource information for cluster $ROOK_NAMESPACE"
+RSRCLOG="$ROOKLOG/resources"
+mkdir "$RSRCLOG"
+
+plugin_message "Collecting Kubernetes Resource information for cluster $ROOK_NAMESPACE > $RSRCLOG/"
 plugin_message "" # newline
-resource_overview_and_detail "$ROOK_NAMESPACE" pods >> $ROOKLOG/pods 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" replicasets >> $ROOKLOG/replicasets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" deployments >> $ROOKLOG/deployments 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" "jobs" >> $ROOKLOG/jobs 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" daemonsets >> $ROOKLOG/daemonsets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" statefulsets >> $ROOKLOG/statefulsets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" configmaps >> $ROOKLOG/configmaps 2>&1
+
+resource_overview_and_detail "$ROOK_NAMESPACE" pods > $RSRCLOG/pods 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" replicasets > $RSRCLOG/replicasets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" deployments > $RSRCLOG/deployments 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" "jobs" > $RSRCLOG/jobs 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" daemonsets > $RSRCLOG/daemonsets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" statefulsets > $RSRCLOG/statefulsets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" configmaps > $RSRCLOG/configmaps 2>&1
 # TODO: does detail on secrets reveal too much secure info about a customer?
-resource_overview "$ROOK_NAMESPACE" secrets >> $ROOKLOG/secrets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" services >> $ROOKLOG/services 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" clusterroles >> $ROOKLOG/clusterroles 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" clusterrolebindings >> $ROOKLOG/clusterrolebindings 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" roles >> $ROOKLOG/roles 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" rolebindings >> $ROOKLOG/rolebindings 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" serviceaccounts >> $ROOKLOG/serviceaccounts 2>&1
+resource_overview "$ROOK_NAMESPACE" secrets > $RSRCLOG/secrets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" services > $RSRCLOG/services 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" clusterroles > $RSRCLOG/clusterroles 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" clusterrolebindings > $RSRCLOG/clusterrolebindings 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" roles > $RSRCLOG/roles 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" rolebindings > $RSRCLOG/rolebindings 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" serviceaccounts > $RSRCLOG/serviceaccounts 2>&1
 
 ROOK_SHELL="${KUBECTL_ROOK:?} exec -t deploy/rook-ceph-operator --"
 
-plugin_message "Collecting Rook-Ceph Operator information for cluster $ROOK_NAMESPACE"
+plugin_message "Collecting Rook-Ceph Operator information for cluster $ROOK_NAMESPACE > $ROOKLOG/operator"
 plugin_message "" # newline
 {
     selector="--selector 'app=rook-ceph-operator'"
@@ -87,16 +87,15 @@ plugin_message "" # newline
     # TODO: does this reveal too much secure info about a customer?
     # plugin_command "$ROOK_SHELL cat /var/lib/rook/*/*.keyring" 2>&1
     plugin_command "$ROOK_SHELL ls --recursive /etc/ceph" 2>&1
-} >> $ROOKLOG/operator
+} > $ROOKLOG/operator
 
-plugin_command "$ROOK_SHELL rook version" &> $ROOKLOG/rook-version
-
+plugin_command "$ROOK_SHELL rook version" > $ROOKLOG/rook-version 2>&1
 
 #############################################################
-plugin_message "Collecting Rook-Ceph Custom Resources for cluster $ROOK_NAMESPACE"
-
 CRLOG=$ROOKLOG/custom-resources
 mkdir "$CRLOG"
+
+plugin_message "Collecting Rook-Ceph Custom Resources for cluster $ROOK_NAMESPACE > $CRLOG/"
 
 crds_json="$($KUBECTL get crds --output=json)"
 crds="$(echo "$crds_json" | jq -r '.items[].metadata.name')"
@@ -107,7 +106,7 @@ for crd in $crds; do
         # each resource is, e.g., cephcluster.rook.io/rook-ceph
         logfile="${resource//\//_}" # replace '/' char with '_' for log file name
         plugin_message "  found Custom Resource $resource"
-        resource_overview_and_detail "$ROOK_NAMESPACE" "$resource" >> "$CRLOG"/$logfile
+        resource_overview_and_detail "$ROOK_NAMESPACE" "$resource" > "$CRLOG"/$logfile
         done
     fi
 done
@@ -128,62 +127,24 @@ while read pod dtype did phase; do
     if [[ "$dtype" != "null" ]] && [[ "$did" != "null" ]]; then
         daemon="$dtype.$did"
     fi
-    phase="${phase,,}" # convert to lower case (only in bash 4+)
 
     if [[ -z "$daemon" ]]; then
         plugin_message "  Pod does not run a Ceph daemon"
     fi
-    if [[ "$phase" != "running" ]]; then
+    if [[ "$phase" != "Running" ]]; then
         plugin_message "  Pod is not running"
     fi
 
-    if [[ "$phase" = "running" ]] && [[ -n "$daemon" ]]; then
-        plugin_message "  collecting information about daemon $daemon"
-        DAEMONLOG=$LOG/ceph/daemon/$daemon
-        mkdir -p $DAEMONLOG
+    if [[ "$phase" = "Running" ]] && [[ -n "$daemon" ]]; then
+        # some Rook daemons set CEPH_ARGS, which needs to be unset for 'ceph daemon' commands
+        # fix any such case by resetting the whole env with 'env -i'
+        container_shell="$KUBECTL_ROOK exec $pod -- env -i"
 
-        # some Rook daemons set CEPH_ARGS, which needs to be unset; cover any such case with 'env -i'
-        CEPH_DAEMON_CMD="$KUBECTL_ROOK exec $pod -- env -i $CEPH daemon $daemon"
-
-        if [[ "$daemon" =~ ^(mon|mgr|mds|osd) ]] ; then
-            plugin_command $CEPH_DAEMON_CMD config show > $DAEMONLOG/ceph-daemon-config 2>&1
-            plugin_command $CEPH_DAEMON_CMD perf dump > $DAEMONLOG/ceph-daemon-perf 2>&1
-        fi
-
-        case $daemon in
-        mds.*)
-            plugin_command $CEPH_DAEMON_CMD dump_historic_ops > $DAEMONLOG/ceph-daemon-historic_ops 2>&1
-            plugin_command $CEPH_DAEMON_CMD status > $DAEMONLOG/ceph-daemon-status 2>&1
-            plugin_command $CEPH_DAEMON_CMD get subtrees > $DAEMONLOG/ceph-daemon-subtrees 2>&1
-            ;;
-        mgr.*)
-            plugin_command $CEPH_DAEMON_CMD status > $DAEMONLOG/ceph-daemon-status 2>&1
-            ;;
-        mon.*)
-            plugin_command $CEPH_DAEMON_CMD dump_historic_ops > $DAEMONLOG/ceph-daemon-historic_ops 2>&1
-            ;;
-        osd.*)
-            plugin_command $CEPH_DAEMON_CMD dump_historic_ops > $DAEMONLOG/ceph-daemon-historic_ops 2>&1
-            plugin_command $CEPH_DAEMON_CMD dump_ops_in_flight > $DAEMONLOG/ceph-daemon-ops_in_flight 2>&1
-            plugin_command $CEPH_DAEMON_CMD status > $DAEMONLOG/ceph-daemon-status 2>&1
-            plugin_command $CEPH_DAEMON_CMD dump_watchers > $DAEMONLOG/ceph-daemon-watchers 2>&1
-            ;;
-        nfs.*)
-            echo "NFS daemons are not supported currently"
-            ;;
-        iscsi.*)
-            echo "iSCSI daemons are not supported currently"
-            ;;
-        prometheus.*)
-            echo "prometheus daemons are not supported currently"
-            # TODO: support Rook logging w/ Prometheus
-            ;;
-        esac
-
+        collect_info_from_daemon "$daemon" "$container_shell"
     fi
 
-    plugin_message "  collecting Pod logs"
-    pod_logs $ROOK_NAMESPACE $pod >> "$PODLOG"/$pod-logs
+    plugin_message "  collecting Pod logs > $PODLOG/"
+    pod_logs "$ROOK_NAMESPACE" "$pod" > "$PODLOG/$pod-logs"
 
     plugin_message "" # newline
 done

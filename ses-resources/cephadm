@@ -122,65 +122,9 @@ if [ -n "${CEPH_SHELL}" ]; then
         while read container_id daemon state; do
             [[ "$state" == "running" ]] || continue
 
-            mkdir -p $LOG/ceph/$daemon
+            container_shell="cephadm enter --name $daemon --"
 
-            if [[ "$daemon" =~ ^(mon|mgr|mds|osd) ]] ; then
-                cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} config show \
-                     > $LOG/ceph/${daemon}/ceph-daemon-config 2>&1
-                cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} perf dump \
-                     > $LOG/ceph/${daemon}/ceph-daemon-perf 2>&1
-            fi
-
-            case $daemon in
-                mds.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
-                         > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} status \
-                         > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} get subtrees \
-                         > $LOG/ceph/${daemon}/ceph-daemon-subtrees 2>&1
-                    ;;
-                mgr.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} status \
-                         > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
-                    ;;
-                mon.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
-                         > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
-                    ;;
-                osd.*)
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_historic_ops \
-                         > $LOG/ceph/${daemon}/ceph-daemon-historic_ops 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_ops_in_flight \
-                         > $LOG/ceph/${daemon}/ceph-daemon-ops_in_flight 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} status \
-                         > $LOG/ceph/${daemon}/ceph-daemon-status 2>&1
-                    cephadm enter --name ${daemon} -- ceph --connect-timeout=$CT daemon ${daemon} dump_watchers \
-                         > $LOG/ceph/${daemon}/ceph-daemon-watchers 2>&1
-                    ;;
-                nfs.*)
-                    plugin_command "cephadm enter --name ${daemon} -- cat /etc/ganesha/ganesha.conf" \
-                        > $LOG/ceph/${daemon}/ganesha-config 2>&1
-                    NFS_USER=$(grep -m 1 'UserId =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
-                    NFS_POOL=$(grep -m 1 'pool =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
-                    NFS_NS=$(grep -m 1 'namespace =' $LOG/ceph/${daemon}/ganesha-config|cut -d '"' -f 2)
-                    for o in $(cephadm enter --name ${daemon} -- rados --id "${NFS_USER}" --pool "${NFS_POOL}" --namespace "${NFS_NS}" ls 2>/dev/null) ; do
-                        [[ "$o" =~ ^(conf-|export-) ]] || continue
-                        plugin_command "cephadm enter --name ${daemon} -- rados --id '${NFS_USER}' --pool '${NFS_POOL}' --namespace '${NFS_NS}' get $o -" 2>&1 |
-                            sed "s/\(secret_access_key = \"\).*\(\"\)/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/ganesha-config
-                    done
-                    ;;
-                iscsi.*)
-                    plugin_command "cephadm enter --name ${daemon} -- gwcli export" 2>&1 |
-                        sed "s/\(password\": \"\).*\"/\1$CENSORED\"/g" >> $LOG/ceph/${daemon}/gwcli-export
-                    ;;
-                prometheus.*)
-                    # cephadm configures the prometheus container to store
-                    # metrics in /prometheus, not /var/lib/prometheus/metrics
-                    plugin_command "cephadm enter --name ${daemon} -- du -s /prometheus" > $LOG/ceph/${daemon}/prometheus-du
-                    plugin_command "cephadm enter --name ${daemon} -- du -hs /prometheus" >> $LOG/ceph/${daemon}/prometheus-du
-
-            esac
+            collect_info_from_daemon "$daemon" "$container_shell"
         done
     fi
 
