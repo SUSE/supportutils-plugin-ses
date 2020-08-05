@@ -23,7 +23,7 @@ if ! plugin_command "$KUBECTL version" &> "$KUBELOG"/kube-version; then
     exit 1 # cannot collect any Rook info w/o a K8s cluster connection
 fi
 
-plugin_message "Collecting general Kubernetes information relevant to Rook > $KUBELOG/"
+plugin_message "Collecting general Kubernetes information relevant to Rook > $KUBELOG/..."
 plugin_message "" # newline
 
 {
@@ -51,7 +51,7 @@ fi
 RSRCLOG="$ROOKLOG/resources"
 mkdir "$RSRCLOG"
 
-plugin_message "Collecting Kubernetes Resource information for cluster $ROOK_NAMESPACE > $RSRCLOG/"
+plugin_message "Collecting Kubernetes Resource information for cluster $ROOK_NAMESPACE > $RSRCLOG/..."
 plugin_message "" # newline
 
 resource_overview_and_detail "$ROOK_NAMESPACE" pods > $RSRCLOG/pods 2>&1
@@ -95,7 +95,7 @@ plugin_command "$ROOK_SHELL rook version" > $ROOKLOG/rook-version 2>&1
 CRLOG=$ROOKLOG/custom-resources
 mkdir "$CRLOG"
 
-plugin_message "Collecting Rook-Ceph Custom Resources for cluster $ROOK_NAMESPACE > $CRLOG/"
+plugin_message "Collecting Rook-Ceph Custom Resources for cluster $ROOK_NAMESPACE > $CRLOG/..."
 
 crds_json="$($KUBECTL get crds --output=json)"
 crds="$(echo "$crds_json" | jq -r '.items[].metadata.name')"
@@ -118,6 +118,8 @@ section_header "Rook-Ceph Pod inspection"
 PODLOG=$ROOKLOG/pod-logs
 mkdir "$PODLOG"
 
+plugin_message "Collecting Rook-Ceph Pod logs > $PODLOG/..."
+
 pods_json="$($KUBECTL_ROOK get pods --output=json)"
 echo "$pods_json" | jq -r '.items[] | "\(.metadata.name) \(.metadata.labels.ceph_daemon_type) \(.metadata.labels.ceph_daemon_id) \(.status.phase)"' |
 while read pod dtype did phase; do
@@ -128,11 +130,8 @@ while read pod dtype did phase; do
         daemon="$dtype.$did"
     fi
 
-    if [[ -z "$daemon" ]]; then
-        plugin_message "  Pod does not run a Ceph daemon"
-    fi
-    if [[ "$phase" != "Running" ]]; then
-        plugin_message "  Pod is not running"
+    if [[ "$phase" != "Running" ]] && [[ -n "$daemon" ]]; then
+        plugin_message "  Pod is not running for daemon $daemon"
     fi
 
     if [[ "$phase" = "Running" ]] && [[ -n "$daemon" ]]; then
@@ -143,7 +142,6 @@ while read pod dtype did phase; do
         collect_info_from_daemon "$daemon" "$container_shell"
     fi
 
-    plugin_message "  collecting Pod logs > $PODLOG/"
     pod_logs "$ROOK_NAMESPACE" "$pod" > "$PODLOG/$pod-logs"
 
     plugin_message "" # newline
@@ -157,22 +155,20 @@ PODLOG=$ROOKLOG/pods
 # Determine which Rook image the cluster is using for the collector helper
 operator_json="$($KUBECTL_ROOK get deployment rook-ceph-operator --output=json)"
 ROOK_IMAGE="$(echo "$operator_json" | jq -r '.spec.template.spec.containers[0].image')"
-plugin_message "ROOK_IMAGE=$ROOK_IMAGE"
-plugin_message "" # newline
 
+plugin_message "Starting Rook-Ceph cluster collector helper in namespace '$ROOK_NAMESPACE' with Rook image '$ROOK_IMAGE'"
+plugin_message "" # newline
 if ! start_collector_helper "$ROOK_NAMESPACE" "$ROOK_IMAGE"; then
     exit 1 # need collector to get more info than this; fail if we can't continue
 fi
 # always try to remove the collector helper on script exit
 trap stop_collector_helper EXIT
 
-plugin_command "$COLLECTOR_SHELL ceph status"
-# TODO: COLLECTOR_SHELL is CEPH_SHELL from Tim's SES supportutils
+collect_info_from_ceph_cli "$COLLECTOR_SHELL"
 
 
 #############################################################
 section_header "Rook log files"
-PODLOG=$ROOKLOG/pods
 
 if cluster_json="$($KUBECTL_ROOK get CephCluster $ROOK_NAMESPACE --output=json)"; then
     dataDirHostPath="$(echo "$cluster_json" | jq -r '.spec.dataDirHostPath')"

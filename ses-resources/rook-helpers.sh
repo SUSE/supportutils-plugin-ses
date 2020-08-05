@@ -172,5 +172,4 @@ dump_collector_helper_info() {
 
 stop_collector_helper() {
   plugin_command "$KUBECTL delete --filename='$COLLECTOR_MANIFEST'" >> "$COLLECTOR_LOG" 2>&1
-  unset COLLECTOR_SHELL
 }
