@@ -6,53 +6,39 @@
 #############################################################
 section_header "Ceph cluster status"
 
+CEPH_SHELL="cephadm shell --"
+
+plugin_command "cephadm ls" >> $LOG/ceph/cephadm-status 2>&1
+plugin_command "cephadm check-host" >> $LOG/ceph/cephadm-status 2>&1
+plugin_command "cephadm inspect-image" >> $LOG/ceph/cephadm-status 2>&1
+
+collect_info_from_cli "$CEPH_SHELL"
+
+# The above dumps a summary of crash information for the entire cluster.
+# The below will dump crash logs for *this* node, if there are any.
+for crash in /var/lib/ceph/*/crash ; do
+    [ -d $crash ] && cp -a $crash $LOG/ceph/crash
+done
+
 if [ -x "$(which cephadm 2>/dev/null)" ] ; then
-    CEPH_SHELL="cephadm shell --"
-    plugin_command "cephadm ls" >> $LOG/ceph/cephadm-status 2>&1
-    plugin_command "cephadm check-host" >> $LOG/ceph/cephadm-status 2>&1
-    plugin_command "cephadm inspect-image" >> $LOG/ceph/cephadm-status 2>&1
-else
-    plugin_message "cephadm not found"
-fi
+    cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
+    while read container_id daemon state; do
+        [[ "$state" == "running" ]] || continue
 
-# TODO: for k8s/rook support, set CEPH_SHELL appropriately here
+        container_shell="cephadm enter --name $daemon --"
 
-if [ -n "${CEPH_SHELL}" ]; then
-    # timeout status commands after 5 seconds
-    CT=5
-
-    collect_info_from_ceph_cli "$CEPH_SHELL"
-
-    # The above dumps a summary of crash information for the entire cluster.
-    # The below will dump crash logs for *this* node, if there are any.
-    for crash in /var/lib/ceph/*/crash ; do
-        [ -d $crash ] && cp -a $crash $LOG/ceph/crash
+        collect_info_from_daemon "$daemon" "$container_shell"
     done
-
-    if [ -x "$(which cephadm 2>/dev/null)" ] ; then
-        cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
-        while read container_id daemon state; do
-            [[ "$state" == "running" ]] || continue
-
-            container_shell="cephadm enter --name $daemon --"
-
-            collect_info_from_daemon "$daemon" "$container_shell"
-        done
-    fi
-
-    plugin_message "Cluster status dumped to ceph subdirectory"
 fi
 
-if [ -x "$(which cephadm 2>/dev/null)" ] ; then
-    # `cephadm ceph-volume` dumps ceph-volume output to stderr prefixed with
-    # INFO:cephadm:/usr/bin/podman:stdout, so grepping that junk out to avoid
-    # duplicating the output.
-    plugin_command "cephadm ceph-volume lvm list" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-list
-    plugin_command "cephadm ceph-volume inventory -- --format json-pretty" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory.json
-    plugin_command "cephadm ceph-volume inventory" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory
-else
-    plugin_message "cephadm not found"
-fi
+plugin_message "Cluster status dumped to ceph subdirectory"
+
+# `cephadm ceph-volume` dumps ceph-volume output to stderr prefixed with
+# INFO:cephadm:/usr/bin/podman:stdout, so grepping that junk out to avoid
+# duplicating the output.
+plugin_command "cephadm ceph-volume lvm list" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-list
+plugin_command "cephadm ceph-volume inventory -- --format json-pretty" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory.json
+plugin_command "cephadm ceph-volume inventory" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory
 
 if [ -d /etc/ceph/osd ]; then
     mkdir -p $LOG/ceph/ceph-volume/simple-scan
