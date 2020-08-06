@@ -48,27 +48,27 @@ fi
 
 #############################################################
 
-RSRCLOG="$ROOKLOG/resources"
+RSRCLOG="$ROOKLOG"/resources
 mkdir "$RSRCLOG"
 
 plugin_message "Collecting Kubernetes Resource information for cluster $ROOK_NAMESPACE > $RSRCLOG/..."
 plugin_message "" # newline
 
-resource_overview_and_detail "$ROOK_NAMESPACE" pods > $RSRCLOG/pods 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" replicasets > $RSRCLOG/replicasets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" deployments > $RSRCLOG/deployments 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" "jobs" > $RSRCLOG/jobs 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" daemonsets > $RSRCLOG/daemonsets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" statefulsets > $RSRCLOG/statefulsets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" configmaps > $RSRCLOG/configmaps 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" pods > "$RSRCLOG"/pods 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" replicasets > "$RSRCLOG"/replicasets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" deployments > "$RSRCLOG"/deployments 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" "jobs" > "$RSRCLOG"/jobs 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" daemonsets > "$RSRCLOG"/daemonsets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" statefulsets > "$RSRCLOG"/statefulsets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" configmaps > "$RSRCLOG"/configmaps 2>&1
 # TODO: does detail on secrets reveal too much secure info about a customer?
-resource_overview "$ROOK_NAMESPACE" secrets > $RSRCLOG/secrets 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" services > $RSRCLOG/services 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" clusterroles > $RSRCLOG/clusterroles 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" clusterrolebindings > $RSRCLOG/clusterrolebindings 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" roles > $RSRCLOG/roles 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" rolebindings > $RSRCLOG/rolebindings 2>&1
-resource_overview_and_detail "$ROOK_NAMESPACE" serviceaccounts > $RSRCLOG/serviceaccounts 2>&1
+resource_overview "$ROOK_NAMESPACE" secrets > "$RSRCLOG"/secrets 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" services > "$RSRCLOG"/services 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" clusterroles > "$RSRCLOG"/clusterroles 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" clusterrolebindings > "$RSRCLOG"/clusterrolebindings 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" roles > "$RSRCLOG"/roles 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" rolebindings > "$RSRCLOG"/rolebindings 2>&1
+resource_overview_and_detail "$ROOK_NAMESPACE" serviceaccounts > "$RSRCLOG"/serviceaccounts 2>&1
 
 ROOK_SHELL="${KUBECTL_ROOK:?} exec -t deploy/rook-ceph-operator --"
 
@@ -87,12 +87,12 @@ plugin_message "" # newline
     # TODO: does this reveal too much secure info about a customer?
     # plugin_command "$ROOK_SHELL cat /var/lib/rook/*/*.keyring" 2>&1
     plugin_command "$ROOK_SHELL ls --recursive /etc/ceph" 2>&1
-} > $ROOKLOG/operator
+} > "$ROOKLOG"/operator
 
-plugin_command "$ROOK_SHELL rook version" > $ROOKLOG/rook-version 2>&1
+plugin_command "$ROOK_SHELL rook version" > "$ROOKLOG"/rook-version 2>&1
 
 #############################################################
-CRLOG=$ROOKLOG/custom-resources
+CRLOG="$ROOKLOG"/custom-resources
 mkdir "$CRLOG"
 
 plugin_message "Collecting Rook-Ceph Custom Resources for cluster $ROOK_NAMESPACE > $CRLOG/..."
@@ -115,7 +115,7 @@ plugin_message "" # newline
 
 #############################################################
 section_header "Rook-Ceph Pod inspection"
-PODLOG=$ROOKLOG/pod-logs
+PODLOG="$ROOKLOG"/pod-logs
 mkdir "$PODLOG"
 
 plugin_message "Collecting Rook-Ceph Pod logs > $PODLOG/..."
@@ -150,7 +150,6 @@ done
 
 #############################################################
 section_header "Ceph cluster information"
-PODLOG=$ROOKLOG/pods
 
 # Determine which Rook image the cluster is using for the collector helper
 operator_json="$($KUBECTL_ROOK get deployment rook-ceph-operator --output=json)"
