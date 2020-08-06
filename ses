@@ -11,23 +11,29 @@
 #############################################################
 # LOAD / SET SCRIPT ENV
 
+# This script version
 SVER=1.0.0
-RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
-export SES_RESOURCES_DIR=${SES_RESOURCES_DIR:-"/usr/lib/supportconfig/resources/ses/"} # override only for development
-export LOG_LINES=5000  # 0 means include the entire file
-export CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
 
+# Load common supportconfig plugin resources
+RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
 [ -s $RCFILE ] && . $RCFILE || { echo "ERROR: Initializing resource file: $RCFILE"; exit 1; }
 
+# Identify the supportconfig plugin resources dir, and load SES plugin helper resources
+# (This can be overridden, but only do so for development)
+export SES_RESOURCES_DIR=${SES_RESOURCES_DIR:-"/usr/lib/supportconfig/resources/ses/"}
 source "$SES_RESOURCES_DIR"/helpers.sh
 
-# base log dir for all logs from the SES supportutils plugin
+# For sensitive data like access keys, replace them with $CENSORED text
+export CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
+
+# Log dirs to use for storing common data
+#
+# Base log dir for all logs from the SES supportutils plugin
 export CEPHLOG="$LOG"/ceph
 mkdir --parents "$CEPHLOG"
-
+#
 # log dir for all Ceph daemon-specific information
 export DAEMONLOG="$CEPHLOG"/daemon
-mkdir "$DAEMONLOG"
 
 
 #############################################################
