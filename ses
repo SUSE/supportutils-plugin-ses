@@ -8,6 +8,9 @@
 # Modified:    2015-02-13
 #############################################################
 
+#############################################################
+# LOAD / SET SCRIPT ENV
+
 SVER=1.0.0
 RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
 export SES_RESOURCES_DIR=${SES_RESOURCES_DIR:-"/usr/lib/supportconfig/resources/ses/"} # override only for development
@@ -28,13 +31,15 @@ mkdir "$DAEMONLOG"
 
 
 #############################################################
-# TUNABLES
+# USER TUNABLES
+#
 # User-facing tunables should be of the form OPTION_SES_
 # and should have a default value set.
 # Internal variables can be named differently. Example below:
 #   export INTERNAL_VAR="${OPTION_SES_USER_OPTION:-default}"
 
-export SES_BACKEND="${OPTION_SES_BACKEND:-cephadm}"
+# OPTION_SES_BACKEND="" means the script should auto-detect the backend
+export SES_BACKEND="${OPTION_SES_BACKEND:-""}"
 
 export INACTIVE_PG_QUERY_MAX="${OPTION_SES_INACTIVE_PG_QUERY_MAX:-20}"
 export RBD_INFO_MAX="${OPTION_SES_RBD_INFO_MAX:-10}"
@@ -42,20 +47,67 @@ export CT=${OPTION_SES_CEPH_CONNECT_TIMEOUT_SECONDS:-5}
 
 # Tunables specifically for OPTION_SES_BACKEND="cephadm"
 
-# Tunables specifically for OPTION_SES_BACKEND="rook" (not yet supported)
+# Tunables specifically for OPTION_SES_BACKEND="rook"
 export KUBECTL="${OPTION_SES_KUBECTL_CMD:-kubectl}"
 export ROOK_NAMESPACE="${OPTION_SES_ROOK_NAMESPACE:-rook-ceph}"
 
 
 #############################################################
+# SET VARIABLES THAT WILL BE USED BY LATER SCRIPTS
 export CEPH="ceph --connect-timeout=$CT"
 
 
 #############################################################
-section_header "Supportconfig Plugin for SUSE Enterprise Storage, v${SVER}"
+# START OF MAIN SCRIPT
+section_header "Supportconfig Plugin for SUSE Enterprise Storage (SES), v${SVER}"
 
-# This top-level script is mostly an entrypoint which takes user inputs and calls out to the
-# necessary resources to collect logs based on that input
+#
+# Validate RPMs for all backends
+#
+rpm_list="$SES_RESOURCES_DIR"/rpm-list
+for thisrpm in $(cat "$rpm_list"); do
+    validate_rpm_if_installed "$thisrpm"
+done
+
+#
+# AUTO-DETECT BACKEND
+#
+
+# If backend is not specified by the user, auto-detect the backend as well as we can\
+if [[ "$SES_BACKEND" == "" ]]; then
+    plugin_message "Auto-detecting SES backend"
+    {
+        section_header "Outputs from auto-detecting backend"
+        if plugin_command "cephadm ls" 2>&1; then
+            SES_BACKEND="cephadm"
+        elif plugin_command "$KUBECTL get namespace $ROOK_NAMESPACE" 2>&1; then
+            # existence of the Rook namespace is generally the minimum thing needed to even bother
+            # trying to collect info about a Rook cluster.
+            SES_BACKEND="rook"
+        fi
+        section_header "Result from auto-detecting backend"
+        if [[ -n "$SES_BACKEND" ]]; then
+            plugin_message "detected backend: $SES_BACKEND"
+        else
+            plugin_message "detected backend: NONE"
+        fi
+    } > "$CEPHLOG"/auto-detect-backend
+
+    if [[ -z "$SES_BACKEND" ]]; then
+        print_error "Failed to auto-detect the SES backend."
+        plugin_message "  See '$CEPHLOG/auto-detect-backend' for detailed results from auto-detection."
+        plugin_message "  Consider setting OPTION_SES_BACKEND manually to continue."
+        exit 1
+    else
+        plugin_message "Auto-detected backend: $SES_BACKEND"
+        plugin_message "" # newline
+    fi
+fi
+
+#
+# START BACKEND-SPECIFIC SCRIPT
+#
+
 case $SES_BACKEND in
 cephadm)
     plugin_message "SES backend: cephadm"

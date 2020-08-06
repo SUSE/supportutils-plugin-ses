@@ -3,17 +3,8 @@
 # Source this to run cephadm-specific validations
 # for the SUSE Enterprise Storage supportutils plugin
 
-
-#############################################################
-rpm_list="$SES_SES_RESOURCES_DIR"/rpm-list
-for thisrpm in $(cat "$rpm_list"); do
-    validate_rpm_if_installed "$thisrpm"
-done
-
 #############################################################
 section_header "Ceph cluster status"
-
-mkdir $LOG/ceph
 
 if [ -x "$(which cephadm 2>/dev/null)" ] ; then
     CEPH_SHELL="cephadm shell --"
@@ -30,7 +21,7 @@ if [ -n "${CEPH_SHELL}" ]; then
     # timeout status commands after 5 seconds
     CT=5
 
-    collect_info_from_cli "$CEPH_SHELL"
+    collect_info_from_ceph_cli "$CEPH_SHELL"
 
     # The above dumps a summary of crash information for the entire cluster.
     # The below will dump crash logs for *this* node, if there are any.

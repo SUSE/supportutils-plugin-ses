@@ -3,7 +3,9 @@
 # Source this to import helper functions
 # for the SUSE Enterprise Storage supportutils plugin
 
+
 #############################################################
+# Basic helper functions
 
 print_error() {
     echo "ERROR: $*"
@@ -28,6 +30,7 @@ validate_rpm_if_installed() {
     echo
 }
 
+
 #############################################################
 # Collect information from the Ceph CLI
 collect_info_from_ceph_cli() {
@@ -36,7 +39,8 @@ collect_info_from_ceph_cli() {
     # A command we are trying to call could hang or fail for myriad reasons, so add a timeout to all
     # calls. Use a multiplier of Ceph's connect timeout so that Ceph's timeout, if it occurs, is
     # sure to happen before the timeout command times out; this will give better error info.
-    ceph_shell="$ceph_shell timeout $((CT * 2))"
+    # Add --verbose option to timeout so output explicitly says it timed out.
+    ceph_shell="$ceph_shell timeout --verbose $((CT * 2))"
 
     if ! plugin_command "$ceph_shell $CEPH --status" > "$CEPHLOG"/ceph-status 2>&1; then
         print_error "ceph --status failed (missing ceph.conf or admin keyring on host?)"
@@ -137,12 +141,16 @@ collect_info_from_ceph_cli() {
     } > "$CEPHLOG"/ceph-crash-info
 }
 
+
 #############################################################
 # Collect advanced/admin debug information about a Ceph daemon, and log it into the appropriate
 # directory. This information should then be the same for all backends
 collect_info_from_daemon() {
     local daemon="$1" # e.g., "mon.b", "osd.5", "mds.b"
     local container_shell="$2" # e.g., "cephadm enter --name mon.b --" or "kubectl -n rook-ceph exec <pod> -- env -i"
+
+    # Only create the daemon log dir if we are starting to collect info for any daemons
+    mkdir --parents "$DAEMONLOG"
 
     local logdir="$DAEMONLOG"/"$daemon"
     mkdir "$logdir"
@@ -220,5 +228,6 @@ _get_value_from_nfs_config() {
     val="${val#[\'\"]}" # strip any single- or double-quotes off the beginning
     echo "$val"
 }
+
 
 #############################################################
