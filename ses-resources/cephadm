@@ -8,20 +8,21 @@ section_header "Ceph cluster status"
 
 CEPH_SHELL="cephadm shell --"
 
-plugin_command "cephadm ls" >> $LOG/ceph/cephadm-status 2>&1
-plugin_command "cephadm check-host" >> $LOG/ceph/cephadm-status 2>&1
-plugin_command "cephadm inspect-image" >> $LOG/ceph/cephadm-status 2>&1
+{
+    plugin_command "cephadm ls" 2>&1
+    plugin_command "cephadm check-host" 2>&1
+    plugin_command "cephadm inspect-image" 2>&1
+} > "$CEPHLOG"/cephadm-status
 
 collect_info_from_cli "$CEPH_SHELL"
 
 # The above dumps a summary of crash information for the entire cluster.
 # The below will dump crash logs for *this* node, if there are any.
 for crash in /var/lib/ceph/*/crash ; do
-    [ -d $crash ] && cp -a $crash $LOG/ceph/crash
+    [ -d "$crash" ] && cp -a "$crash" "$CEPHLOG"/crash
 done
 
-if [ -x "$(which cephadm 2>/dev/null)" ] ; then
-    cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
+cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
     while read container_id daemon state; do
         [[ "$state" == "running" ]] || continue
 
@@ -29,20 +30,19 @@ if [ -x "$(which cephadm 2>/dev/null)" ] ; then
 
         collect_info_from_daemon "$daemon" "$container_shell"
     done
-fi
 
 plugin_message "Cluster status dumped to ceph subdirectory"
 
 # `cephadm ceph-volume` dumps ceph-volume output to stderr prefixed with
 # INFO:cephadm:/usr/bin/podman:stdout, so grepping that junk out to avoid
 # duplicating the output.
-plugin_command "cephadm ceph-volume lvm list" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-list
-plugin_command "cephadm ceph-volume inventory -- --format json-pretty" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory.json
-plugin_command "cephadm ceph-volume inventory" 2>&1 | grep -v '/usr/bin/podman:stdout' > $LOG/ceph/ceph-volume-inventory
+plugin_command "cephadm ceph-volume lvm list" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$CEPHLOG"/ceph-volume-list
+plugin_command "cephadm ceph-volume inventory -- --format json-pretty" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$CEPHLOG"/ceph-volume-inventory.json
+plugin_command "cephadm ceph-volume inventory" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$CEPHLOG"/ceph-volume-inventory
 
 if [ -d /etc/ceph/osd ]; then
-    mkdir -p $LOG/ceph/ceph-volume/simple-scan
-    cp /etc/ceph/osd/* $LOG/ceph/ceph-volume/simple-scan
+    mkdir -p "$CEPHLOG"/ceph-volume/simple-scan
+    cp /etc/ceph/osd/* "$CEPHLOG"/ceph-volume/simple-scan
     plugin_message "ceph-volume simple scan results copied to /ceph/ceph-volume/simple-scan"
 fi
 
@@ -50,11 +50,11 @@ fi
 section_header "Ceph config"
 
 if [ -d /etc/ceph ]; then
-    if files=$(find /etc/ceph -type f | egrep -v '.keyring$'); then
+    if files=$(find /etc/ceph -type f | grep --extended-regexp --invert-match '.keyring$'); then
         if [ -n "$files" ]; then
-            mkdir $LOG/ceph/conf
+            mkdir "$CEPHLOG"/conf
             for f in $files ; do
-                pconf_files $f > $LOG/ceph/conf/$(basename $f)
+                pconf_files "$f" > "$CEPHLOG"/conf/"$(basename "$f")"
             done
             plugin_message "Ceph config copied to ceph/conf subdirectory"
         fi
@@ -67,29 +67,26 @@ fi
 section_header "Ceph log files"
 
 if [ -d /var/log/ceph ]; then
-    mkdir -p $LOG/ceph/log/ceph
+    mkdir -p "$CEPHLOG"/log/ceph
     # Copy any files directly in /var/log/ceph (e.g. /var/log/ceph/cephadm.log),
     # or in any subdirectory (containerized daemons may log to /var/log/ceph/$FSID)
-    find /var/log/ceph -type f -exec cp '{}' $LOG/ceph/log/ceph ';'
+    find /var/log/ceph -type f -exec cp '{}' "$CEPHLOG"/log/ceph ';'
     plugin_message "Ceph logs copied to ceph/log subdirectory"
 fi
 
-if [ -x "$(which cephadm 2>/dev/null)" ]; then
-    cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
+cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
     while read fsid name ; do
-        mkdir -p $LOG/ceph/log/ceph
+        mkdir -p "$CEPHLOG"/log/ceph
         # Individual daemon logs from journalctl named without the leading "ceph-"
         # string to avoid any conflict with possible log files already copied.
-        plugin_command cephadm logs --fsid $fsid --name $name > $LOG/ceph/log/ceph/$name.log 2>&1
+        plugin_command cephadm logs --fsid "$fsid" --name "$name" > "$CEPHLOG/log/ceph/$name.log" 2>&1
     done
-else
-    plugin_message "cephadm not found"
-fi
+
 
 #############################################################
 section_header "podman images in use"
 
-if [ -x "$(which podman 2>/dev/null)" ]; then
+if command -v podman 2>/dev/null; then
     plugin_command "podman images"
     plugin_command "podman ps -a --format json | jq '.[].Image'"
 else
@@ -101,12 +98,12 @@ fi
 section_header "ceph-salt config"
 
 if [ -f /var/log/ceph-salt.log ]; then
-    cp /var/log/ceph-salt.log $LOG/ceph/log/
+    cp /var/log/ceph-salt.log "$CEPHLOG"/log/
     plugin_message "ceph-salt.log copied to ceph/log/ceph-salt.log"
 fi
-if [ -x "$(which ceph-salt 2>/dev/null)" ]; then
+if command -v ceph-salt 2>/dev/null; then
     plugin_command "ceph-salt export -p " |
-        sed "s/\(password\":\|private_key\":\) .*\(\"\)/\1 \"$CENSORED\"/g" > $LOG/ceph/conf/ceph-salt-export 2>&1
+        sed "s/\(password\":\|private_key\":\) .*\(\"\)/\1 \"$CENSORED\"/g" > "$CEPHLOG"/conf/ceph-salt-export 2>&1
     plugin_message "ceph-salt export results copied to ceph/conf/ceph-salt-export"
 fi
 
@@ -114,9 +111,9 @@ fi
 section_header "Salt config"
 
 if [ -d /etc/salt ]; then
-    if files=$(find /etc/salt -type f | egrep -v '.pem$'); then
+    if files=$(find /etc/salt -type f | grep --extended-regexp --invert-match '.pem$'); then
         if [ -n "$files" ]; then
-            pconf_files $files
+            pconf_files "$files"
         fi
     fi
 fi
@@ -125,22 +122,18 @@ fi
 section_header "Salt log files"
 
 if [ -d /var/log/salt ]; then
-    mkdir -p $LOG/ceph/log/salt
-    cp /var/log/salt/{master,minion} $LOG/ceph/log/salt/
+    mkdir -p "$CEPHLOG"/log/salt
+    cp /var/log/salt/{master,minion} "$CEPHLOG"/log/salt/
     plugin_message "Salt logs copied to ceph/log/salt subdirectory"
 fi
 
 #############################################################
 section_header "Ceph related services"
 
-if [ -x "$(which cephadm 2>/dev/null)" ]; then
-    cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
+cephadm ls | jq -r '.[] | "\(.fsid) \(.name)"' |
     while read fsid name ; do
         plugin_command "systemctl status -l ceph-$fsid@$name.service"
     done
-else
-    plugin_message "cephadm not found"
-fi
 plugin_command "systemctl status -l 'salt*'"
 
 #############################################################
