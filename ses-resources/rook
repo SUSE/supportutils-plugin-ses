@@ -10,8 +10,11 @@ source "$SES_RESOURCES_DIR"/rook-helpers.sh
 
 #############################################################
 section_header "Kubernetes cluster information"
-KUBELOG=$LOG/ceph/kube
+KUBELOG="$CEPHLOG"/kubernetes
 mkdir "$KUBELOG"/
+
+plugin_message "Collecting general Kubernetes information relevant to Rook > $KUBELOG/..."
+plugin_message "" # newline
 
 if ! [ -x "$(command -v $KUBECTL)" ]; then
     echo "ERROR: kubectl does not exist"
@@ -22,9 +25,6 @@ if ! plugin_command "$KUBECTL version" &> "$KUBELOG"/kube-version; then
     echo "ERROR: kubectl cannot connect to a Kubernetes cluster"
     exit 1 # cannot collect any Rook info w/o a K8s cluster connection
 fi
-
-plugin_message "Collecting general Kubernetes information relevant to Rook > $KUBELOG/..."
-plugin_message "" # newline
 
 {
     section_header "nodes overview"
@@ -37,6 +37,10 @@ resource_overview "" namespaces > "$KUBELOG"/namespaces 2>&1
 resource_overview_and_detail "" crds > "$KUBELOG"/crds 2>&1
 resource_overview_and_detail "" podsecuritypolicies > "$KUBELOG"/podsecuritypolicies 2>&1
 
+# Get a dump of "all" resources in the kube-system namespace. This should be info CaaSP is
+# collecting, but for non-CaaSP environments, this can help us determine if there is something like
+# a CNI failure underlying whatever failure Rook-Ceph is experiencing.
+resource_overview_and_detail "kube-system" "all" > "$KUBELOG"/kube-system-resurces
 
 #############################################################
 section_header "Rook-Ceph cluster information"
@@ -177,9 +181,8 @@ fi
 
 rook_log_dir="$dataDirHostPath"/$ROOK_NAMESPACE/log/
 if [ -d "$rook_log_dir" ]; then
-    mkdir -p $LOG/ceph/log/ceph
+    mkdir -p "$CEPHLOG"/log/ceph
     # Copy any files directly in /var/log/ceph (e.g. /var/log/ceph/cephadm.log),
-    # or in any subdirectory (containerized daemons may log to /var/log/ceph/$FSID)
-    find "$rook_log_dir" -type f -exec cp '{}' $LOG/ceph/log/ceph ';'
+    find "$rook_log_dir" -type f -exec cp '{}' "$CEPHLOG"/log/ceph ';'
     plugin_message "Rook logs copied to ceph/log subdirectory"
 fi
