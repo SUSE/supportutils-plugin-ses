@@ -22,8 +22,8 @@ for crash in /var/lib/ceph/*/crash ; do
     [ -d "$crash" ] && cp -a "$crash" "$CEPHLOG"/crash
 done
 
-cephadm ls | jq -r '.[] | "\(.container_id) \(.name) \(.state)"' |
-    while read container_id daemon state; do
+cephadm ls | jq -r '.[] | "\(.name) \(.state)"' |
+    while read daemon state; do
         [[ "$state" == "running" ]] || continue
 
         container_shell="cephadm enter --name $daemon --"
