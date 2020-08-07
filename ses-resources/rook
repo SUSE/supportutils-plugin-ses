@@ -164,7 +164,7 @@ while read pod dtype did phase; do
         collect_info_from_daemon "$daemon" "$container_shell"
     fi
 
-    pod_logs "$ROOK_NAMESPACE" "$pod" > "$PODLOG/$pod-logs"
+    pod_logs "$ROOK_NAMESPACE" "$pod" > "$PODLOG/$pod.log"
 
     plugin_message "" # newline
 done
