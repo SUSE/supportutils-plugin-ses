@@ -118,6 +118,24 @@ plugin_message "" # newline
 
 
 #############################################################
+section_header "Ceph cluster status"
+
+# Determine which Rook image the cluster is using for the collector helper
+operator_json="$($KUBECTL_ROOK get deployment rook-ceph-operator --output=json)"
+ROOK_IMAGE="$(echo "$operator_json" | jq -r '.spec.template.spec.containers[0].image')"
+
+plugin_message "Starting Rook-Ceph cluster collector helper in namespace '$ROOK_NAMESPACE' with Rook image '$ROOK_IMAGE'"
+plugin_message "" # newline
+if ! start_collector_helper "$ROOK_NAMESPACE" "$ROOK_IMAGE"; then
+    exit 1 # need collector to get more info than this; fail if we can't continue
+fi
+# always try to remove the collector helper on script exit
+trap stop_collector_helper EXIT
+
+collect_info_from_ceph_cli "$COLLECTOR_SHELL"
+
+
+#############################################################
 section_header "Rook-Ceph Pod inspection"
 PODLOG="$ROOKLOG"/pod-logs
 mkdir "$PODLOG"
@@ -150,24 +168,6 @@ while read pod dtype did phase; do
 
     plugin_message "" # newline
 done
-
-
-#############################################################
-section_header "Ceph cluster information"
-
-# Determine which Rook image the cluster is using for the collector helper
-operator_json="$($KUBECTL_ROOK get deployment rook-ceph-operator --output=json)"
-ROOK_IMAGE="$(echo "$operator_json" | jq -r '.spec.template.spec.containers[0].image')"
-
-plugin_message "Starting Rook-Ceph cluster collector helper in namespace '$ROOK_NAMESPACE' with Rook image '$ROOK_IMAGE'"
-plugin_message "" # newline
-if ! start_collector_helper "$ROOK_NAMESPACE" "$ROOK_IMAGE"; then
-    exit 1 # need collector to get more info than this; fail if we can't continue
-fi
-# always try to remove the collector helper on script exit
-trap stop_collector_helper EXIT
-
-collect_info_from_ceph_cli "$COLLECTOR_SHELL"
 
 
 #############################################################
