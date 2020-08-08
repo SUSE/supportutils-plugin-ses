@@ -2,7 +2,7 @@
 
 # ONLY SUPPORTS ENVIRONMENTS WHERE ROOK OPERATOR AND CEPH CLUSTER ARE IN SAME NAMESPACE
 
-export ROOKLOG="$CEPHLOG"/rook
+export ROOKLOG="$LOGCEPH"/rook
 mkdir "$ROOKLOG"
 
 source "$SES_RESOURCES_DIR"/rook-helpers.sh
@@ -10,7 +10,7 @@ source "$SES_RESOURCES_DIR"/rook-helpers.sh
 
 #############################################################
 section_header "Kubernetes cluster information"
-KUBELOG="$CEPHLOG"/kubernetes
+KUBELOG="$LOGCEPH"/kubernetes
 mkdir "$KUBELOG"/
 
 plugin_message "Collecting general Kubernetes information relevant to Rook > $KUBELOG/..."
@@ -124,7 +124,9 @@ section_header "Ceph cluster status"
 operator_json="$($KUBECTL_ROOK get deployment rook-ceph-operator --output=json)"
 ROOK_IMAGE="$(echo "$operator_json" | jq -r '.spec.template.spec.containers[0].image')"
 
-plugin_message "Starting Rook-Ceph cluster collector helper in namespace '$ROOK_NAMESPACE' with Rook image '$ROOK_IMAGE'"
+plugin_message "Starting Rook-Ceph cluster collector helper Pod"
+plugin_message "  namespace: $ROOK_NAMESPACE"
+plugin_message "  image:     $ROOK_IMAGE"
 plugin_message "" # newline
 if ! start_collector_helper "$ROOK_NAMESPACE" "$ROOK_IMAGE"; then
     exit 1 # need collector to get more info than this; fail if we can't continue
@@ -141,37 +143,76 @@ PODLOG="$ROOKLOG"/pod-logs
 mkdir "$PODLOG"
 
 plugin_message "Collecting Rook-Ceph Pod logs > $PODLOG/..."
+plugin_message ""
+
+plugin_message "Collecting Ceph daemon logs > $LOGCEPHLOG/..."
+plugin_message ""
+
+plugin_message "Collecting detailed Ceph daemon info > $LOGDAEMON/<daemon>/..."
+plugin_message ""
 
 pods_json="$($KUBECTL_ROOK get pods --output=json)"
-echo "$pods_json" | jq -r '.items[] | "\(.metadata.name) \(.metadata.labels.ceph_daemon_type) \(.metadata.labels.ceph_daemon_id) \(.status.phase)"' |
-while read pod dtype did phase; do
-    plugin_message "Inspecting Pod $pod"
+# We want to list running pods first followed by non-running pods because Rook can be running more
+# than one pod for a given daemon in the case where an old pod is Terminating and a new one is
+# Running or Pending.
+jq_data='"\(.metadata.name) \(.metadata.labels.ceph_daemon_type) \(.metadata.labels.ceph_daemon_id) \(.status.phase)"'
+running_pods="$(echo "$pods_json" | jq -r ".items[] | select(.status.phase==\"Running\") | $jq_data")"
+notrunning_pods="$(echo "$pods_json" | jq -r ".items[] | select(.status.phase!=\"Running\") | $jq_data")"
+{ echo "$running_pods" ; echo "$notrunning_pods" ; } |
+    while read pod dtype did phase; do
+        plugin_message "  found Pod $pod"
 
-    daemon=""
-    if [[ "$dtype" != "null" ]] && [[ "$did" != "null" ]]; then
-        daemon="$dtype.$did"
-    fi
+        podlog="$PODLOG/$pod.log"
+        pod_logs "$ROOK_NAMESPACE" "$pod" > "$podlog" 2>&1
 
-    if [[ "$phase" != "Running" ]] && [[ -n "$daemon" ]]; then
-        plugin_message "  Pod is not running for daemon $daemon"
-    fi
+        daemon=""
+        if [[ "$dtype" != "null" ]] && [[ "$did" != "null" ]]; then
+            daemon="$dtype.$did"
+        fi
 
-    if [[ "$phase" = "Running" ]] && [[ -n "$daemon" ]]; then
-        # some Rook daemons set CEPH_ARGS, which needs to be unset for 'ceph daemon' commands
-        # fix any such case by resetting the whole env with 'env -i'
-        container_shell="$KUBECTL_ROOK exec $pod -- env -i"
+        if [[ "$phase" != "Running" ]] && [[ -n "$daemon" ]]; then
+            plugin_message "    Pod is not running (is $phase) for daemon $daemon"
+        fi
 
-        collect_info_from_daemon "$daemon" "$container_shell"
-    fi
+        # A list of all Rook pods' logs is useful and easy to create. We also want to output daemon
+        # logs in the same format as cephadm so the output is easier to use. Make the
+        # cephadm-equivalent daemon log files symlink to Rook's pod logs to save space.
+        if [[ -n "$daemon" ]]; then
+            mkdir --parents "$LOGCEPHLOG"
+            if [[ "$phase" = "Running" ]]; then
+                # Assume the default log should be the Pod which is Running.
+                log="$LOGCEPHLOG/$daemon"
+            else
+                # If the pod isn't running, note it's status phase in the log file name.
+                log="$LOGCEPHLOG/$daemon.$phase"
+            fi
+            # It's possible there are multiple pods in any given state. Append a number to the log
+            # file until we get a unique log file name.
+            let i=1
+            log_orig="$log" # remember original log name for appending numbers
+            until [[ ! -e "$log.log" ]]; do
+                (( i+=1 ))
+                log="$log_orig($i)"
+            done
+            plugin_message "    logs for daemon $daemon > $log.log"
+            make_link "$podlog" "$log.log"
+        fi
 
-    pod_logs "$ROOK_NAMESPACE" "$pod" > "$PODLOG/$pod.log"
+        if [[ "$phase" = "Running" ]] && [[ -n "$daemon" ]]; then
+            # some Rook daemons set CEPH_ARGS, which needs to be unset for 'ceph daemon' commands
+            # fix any such case by resetting the whole env with 'env -i'
+            container_shell="$KUBECTL_ROOK exec $pod -- env -i"
 
-    plugin_message "" # newline
-done
+            collect_info_from_daemon "$daemon" "$container_shell"
+        fi
+
+    done
 
 
 #############################################################
 section_header "Rook log files"
+
+plugin_message "Collecting Rook log files on disk > $LOGCEPHLOG/..."
 
 if cluster_json="$($KUBECTL_ROOK get CephCluster $ROOK_NAMESPACE --output=json)"; then
     dataDirHostPath="$(echo "$cluster_json" | jq -r '.spec.dataDirHostPath')"
@@ -180,9 +221,11 @@ else
 fi
 
 rook_log_dir="$dataDirHostPath"/$ROOK_NAMESPACE/log/
+plugin_message "  looking in $rook_log_dir"
+plugin_message "" # newline
+
 if [ -d "$rook_log_dir" ]; then
-    mkdir -p "$CEPHLOG"/log/ceph
+    mkdir -p "$LOGCEPHLOG"
     # Copy any files directly in /var/log/ceph (e.g. /var/log/ceph/cephadm.log),
-    find "$rook_log_dir" -type f -exec cp '{}' "$CEPHLOG"/log/ceph ';'
-    plugin_message "Rook logs copied to ceph/log subdirectory"
+    find "$rook_log_dir" -type f -exec cp '{}' "$LOGCEPHLOG" ';'
 fi

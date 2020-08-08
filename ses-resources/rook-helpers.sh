@@ -27,6 +27,16 @@ resource_overview_and_detail() {
     resource_detail "$namespace" "$resource"
 }
 
+get_pod_phase() {
+  local namespace="$1"
+  local pod="$2"
+  if ! pod_json="$($KUBECTL --namespace=$namespace get pod $pod --output=json)"; then
+      return $? # error
+  fi
+  echo "$pod_json" | jq -r '.status.phase'
+  return 0
+}
+
 get_pod_containers() {
     local namespace="$1"
     local pod="$2"
@@ -44,6 +54,10 @@ get_pod_containers() {
 pod_logs() {
     local namespace="$1"
     local pod="$2"
+    # First output the phase of the pod, which is useful contextual information if the pod is
+    # not in the assumed Running state.
+    section_header "pod status phase"
+    { echo -n "pod status phase: " ; get_pod_phase "$namespace" "$pod" ; } 2>&1
     if ! containers="$(get_pod_containers "$namespace" "$pod")"; then
         return $? # error
     fi

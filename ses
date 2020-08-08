@@ -29,11 +29,17 @@ export CENSORED='<<CENSORED BY SUPPORTCONFIG PLUGIN>>'
 # Log dirs to use for storing common data
 #
 # Base log dir for all logs from the SES supportutils plugin
-export CEPHLOG="$LOG"/ceph
-mkdir --parents "$CEPHLOG"
+export LOGCEPH="$LOG"/ceph
+mkdir --parents "$LOGCEPH"
 #
 # log dir for all Ceph daemon-specific information
-export DAEMONLOG="$CEPHLOG"/daemon
+export LOGDAEMON="$LOGCEPH"/daemon
+#
+# base log dir for logs
+export LOGLOG="$LOGCEPH"/log
+#
+# log dir for Ceph daemon logs
+export LOGCEPHLOG="$LOGLOG"/ceph
 
 
 #############################################################
@@ -97,11 +103,11 @@ if [[ "$SES_BACKEND" == "" ]]; then
         else
             plugin_message "detected backend: NONE"
         fi
-    } > "$CEPHLOG"/auto-detect-backend
+    } > "$LOGCEPH"/auto-detect-backend
 
     if [[ -z "$SES_BACKEND" ]]; then
         print_error "Failed to auto-detect the SES backend."
-        plugin_message "  See '$CEPHLOG/auto-detect-backend' for detailed results from auto-detection."
+        plugin_message "  See '$LOGCEPH/auto-detect-backend' for detailed results from auto-detection."
         plugin_message "  Consider setting OPTION_SES_BACKEND manually to continue."
         exit 1
     else
