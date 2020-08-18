@@ -5,6 +5,7 @@
 export ROOKLOG="$LOGCEPH"/rook
 mkdir "$ROOKLOG"
 
+# shellcheck source=ses-resources/
 source "$SES_RESOURCES_DIR"/rook-helpers.sh
 
 

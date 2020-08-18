@@ -21,6 +21,7 @@ RCFILE="/usr/lib/supportconfig/resources/scplugin.rc"
 # Identify the supportconfig plugin resources dir, and load SES plugin helper resources
 # (This can be overridden, but only do so for development)
 export SES_RESOURCES_DIR=${SES_RESOURCES_DIR:-"/usr/lib/supportconfig/resources/ses/"}
+# shellcheck source=ses-resources/
 source "$SES_RESOURCES_DIR"/helpers.sh
 
 # For sensitive data like access keys, replace them with $CENSORED text
@@ -124,12 +125,14 @@ case $SES_BACKEND in
 cephadm)
     plugin_message "SES backend: cephadm"
     plugin_message "" # newline
-    source "$SES_RESOURCES_DIR"/cephadm
+    # shellcheck source=ses-resources/
+    source "$SES_RESOURCES_DIR"/cephadm.rc
     ;;
 rook)
     plugin_message "SES backend: rook"
     plugin_message "" # newline
-    source "$SES_RESOURCES_DIR"/rook
+    # shellcheck source=ses-resources/
+    source "$SES_RESOURCES_DIR"/rook.rc
     exit 1
     ;;
 *)
