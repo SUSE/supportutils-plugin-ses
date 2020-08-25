@@ -41,6 +41,9 @@ export LOGLOG="$LOGCEPH"/log
 #
 # log dir for Ceph daemon logs
 export LOGCEPHLOG="$LOGLOG"/ceph
+#
+# log dir to dump the collection scripts into
+export LOGPLUGIN="$LOGCEPH"/supportutils-plugin
 
 
 #############################################################
@@ -140,3 +143,20 @@ rook)
     exit 1
     ;;
 esac
+
+#
+# COPY LOG COLLECTION SCRIPTS TO OUTPUT FOR INSPECTION IF DESIRED
+#
+{
+    section_header "Index of supportutils plugin files used to collect SES deployment information"
+    plugin_message "" # newline
+    plugin_message "file_name :  original_file_location"
+    plugin_message "-----------------------------------"
+
+    this_script="$(cd "$(dirname "$0")"; pwd -P)/$(basename "$0")"
+
+    for file in $this_script "$SES_RESOURCES_DIR"/*; do
+        cp -a "$file" "$LOGPLUGIN"/.
+        plugin_message "$(basename "$file") :  $file"
+    done
+} > "$LOGPLUGIN"/index-of-files
