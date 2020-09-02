@@ -144,5 +144,6 @@ esac
 #
 # CAT LOG COLLECTION SCRIPTS TO OUTPUT
 #
+section_header "Supportconfig Plugin resources"
 pconf_files "$SES_RESOURCES_DIR"/*
 # Now supportutils will cat out THIS file automatically
