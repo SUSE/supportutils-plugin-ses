@@ -1,22 +1,89 @@
-.TH ses-plugin "8" "13 Feb 2015" "ses-plugin" "Support Utilities Manual"
+.TH ses-plugin "8" "31 Aug 2020" "ses-plugin" "Support Utilities Manual"
+.
 .SH NAME
 ses-plugin \- SUSE Enterprise Storage Plugin for
 .BR supportconfig (8)
 .
+.
 .SH DESCRIPTION
-Supportconfig plugins add functionality to the supportconfig script. This plugin extends supportconfig's functionality to include SUSE Enterprise Storage
-information. Supportconfig saves the plugin output as plugin-ses.txt.
-
-.SH FILES
-.I /usr/lib/supportconfig/plugins/ses
+Supportconfig plugins add functionality to the supportconfig script. This plugin extends
+supportconfig's functionality to include SUSE Enterprise Storage information. Supportconfig saves
+the plugin output as
+.IR plugin\-ses.txt  .
+.
+.
+.SH ENVIRONMENT
+This plugin's behavior can be controlled via environment variables. Default values for the control
+variables are listed next to the variable.
+.
+.SS General controls
+.
+.TP
+.BR OPTION_SES_BACKEND  =""
+This plugin supports different types of backends for SUSE Enterprise Storage clusters. Leaving this
+option unset or setting it to an empty string means the script should auto-detect the backend; this
+is the default behavior. If the script does not autodetect the backend correctly, consider setting
+the backend manually.
 .RS
-The SUSE Enterprise Storage plugin
+.TP
+.I cephadm
+The cephadm backend is used by bare metal Ceph clusters deployed with Salt.
+.TP
+.I rook
+The rook backend is used by Ceph clusters deployed in Kubernetes.
 .RE
+.TP
+.BR OPTION_SES_INACTIVE_PG_QUERY_MAX  =20
+The maximum number of inactive Ceph Placement Groups (PGs) to collect detailed information from.
+.TP
+.BR OPTION_SES_RBD_INFO_MAX  =10
+The maximum number of images to collect detailed information from for each RBD pool.
+.TP
+.BR OPTION_SES_CEPH_CONNECT_TIMEOUT_SECONDS  =5
+The Ceph cluster connect timeout value in seconds given to
+.B ceph \-\-connect\-timeout...
+CLI commands.
+.
+.SS Controls for the \f(BIrook\fP backend
+.
+.TP
+.BR OPTION_SES_ROOK_NAMESPACE  ="rook\-ceph"
+If the Rook cluster from which debug information will be collected does not reside in the
+.BI rook-ceph
+Kubernetes namespace, this
+.B must
+be changed to the correct namespace. When this is set correctly, the plugin should auto\-detect
+.BI rook
+as the backend correctly.
+.TP
+.BR OPTION_SES_KUBECTL_CMD  ="kubectl"
+A custom command can be specified if this node cannot reach the Kubernetes cluster hosting Ceph
+through normal means like setting the
+.B KUBECONFIG
+environment variable for
+.BR kubectl  .
+For example:
+.BR OPTION_SES_KUBECTL_CMD="kubectl\ \-\-user=susannah"  .
+.
+.
+.SH FILES
+.TP
+.I /usr/lib/supportconfig/plugins/ses
+The SUSE Enterprise Storage plugin
+.TP
+.I /usr/lib/supportconfig/resources/ses/
+SUSE Enterprise Storage plugin resource files
+.
+.
 .SH AUTHOR
 Tim Serong <tserong@suse.com>
+.
+.
 .SH REPORTING BUGS
 Please submit bug fixes, comments or enhancement requests via:
 .B http://bugzilla.suse.com
+.
+.
 .SH SEE ALSO
 .BR supportconfig (8)
 .BR supportconfig.conf (5)
