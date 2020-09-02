@@ -1,5 +1,6 @@
 catatonit
 cephadm
+ceph-base
 ceph-common
 ceph-salt
 ceph-salt-formula
@@ -7,7 +8,9 @@ cni
 cni-plugins
 conmon
 fuse-overlayfs
+iperf
 libcephfs2
+libiperf0
 librados2
 librbd1
 librgw2
@@ -21,6 +24,7 @@ python3-rados
 python3-rbd
 python3-rgw
 release-notes-ses
+rook-k8s-yaml
 runc
 ses-admin_en-pdf
 ses-deployment_en-pdf
