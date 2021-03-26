@@ -187,6 +187,7 @@ collect_info_from_daemon() {
     case $daemon in
     mds.*)
         plugin_command "$ceph_daemon_cmd dump_historic_ops" > "$logdir"/ceph-daemon-historic_ops 2>&1
+        plugin_command "$ceph_daemon_cmd dump_ops_in_flight" > "$logdir"/ceph-daemon-ops_in_flight 2>&1
         plugin_command "$ceph_daemon_cmd status" > "$logdir"/ceph-daemon-status 2>&1
         plugin_command "$ceph_daemon_cmd get subtrees" > "$logdir"/ceph-daemon-subtrees 2>&1
         ;;
