@@ -37,7 +37,7 @@ plugin_message "Cluster status dumped to ceph subdirectory"
 # INFO:cephadm:/usr/bin/podman:stdout, so grepping that junk out to avoid
 # duplicating the output.
 plugin_command "cephadm ceph-volume lvm list" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$LOGCEPH"/ceph-volume-list
-plugin_command "cephadm ceph-volume inventory -- --format json-pretty" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$LOGCEPH"/ceph-volume-inventory.json
+plugin_command "cephadm ceph-volume inventory --format json-pretty" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$LOGCEPH"/ceph-volume-inventory.json
 plugin_command "cephadm ceph-volume inventory" 2>&1 | grep --invert-match '/usr/bin/podman:stdout' > "$LOGCEPH"/ceph-volume-inventory
 
 if [ -d /etc/ceph/osd ]; then
