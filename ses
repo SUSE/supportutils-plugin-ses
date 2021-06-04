@@ -62,6 +62,7 @@ if [ -x /usr/bin/ceph ]; then
     plugin_command "ceph ${ID} --connect-timeout=$CT config dump" > $LOG/ceph/ceph-config-dump 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT mon dump" > $LOG/ceph/ceph-mon-dump 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT mgr dump" > $LOG/ceph/ceph-mgr-dump 2>&1
+    plugin_command "ceph ${ID} --connect-timeout=$CT device ls" > $LOG/ceph/ceph-device-ls 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd tree" > $LOG/ceph/ceph-osd-tree 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd df tree" > $LOG/ceph/ceph-osd-df-tree 2>&1
     plugin_command "ceph ${ID} --connect-timeout=$CT osd dump" > $LOG/ceph/ceph-osd-dump 2>&1
