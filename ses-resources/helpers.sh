@@ -75,9 +75,11 @@ collect_info_from_ceph_cli() {
 
     plugin_command "$ceph_shell $CEPH versions" > "$LOGCEPH"/ceph-versions 2>&1
     plugin_command "$ceph_shell $CEPH health detail" > "$LOGCEPH"/ceph-health-detail 2>&1
-    plugin_command "$ceph_shell $CEPH config dump" > "$LOGCEPH"/ceph-config-dump 2>&1
+    plugin_command "$ceph_shell $CEPH config dump" 2>&1 |
+        sed "s/\(ACCESS_KEY\|SECRET_KEY\|PASSWORD\)\(\s*\).*/\1\2$CENSORED/gi" > "$LOGCEPH"/ceph-config-dump
     plugin_command "$ceph_shell $CEPH mon dump" > "$LOGCEPH"/ceph-mon-dump 2>&1
     plugin_command "$ceph_shell $CEPH mgr dump" > "$LOGCEPH"/ceph-mgr-dump 2>&1
+    plugin_command "$ceph_shell $CEPH device ls" > "$LOGCEPH"/ceph-device-ls 2>&1
     plugin_command "$ceph_shell $CEPH osd tree" > "$LOGCEPH"/ceph-osd-tree 2>&1
     plugin_command "$ceph_shell $CEPH osd df tree" > "$LOGCEPH"/ceph-osd-df-tree 2>&1
     plugin_command "$ceph_shell $CEPH osd dump" > "$LOGCEPH"/ceph-osd-dump 2>&1
